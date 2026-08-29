@@ -1,0 +1,41 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: documorph-postgres
+    environment:
+      POSTGRES_DB: DocuMorph_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DOCUMORPH_DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: .
+    container_name: documorph-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DOCUMORPH_DB_URL: jdbc:postgresql://postgres:5432/DocuMorph_db
+      DOCUMORPH_DB_USERNAME: postgres
+      DOCUMORPH_DB_PASSWORD: ${DOCUMORPH_DB_PASSWORD}
+      DOCUMORPH_JWT_SECRET: ${DOCUMORPH_JWT_SECRET}
+      PYTHON_SERVICE_URL: http://host.docker.internal:8000
+      DOCUMORPH_UPLOAD_DIR: /app/uploads
+    ports:
+      - "8080:8080"
+    volumes:
+      - uploads_data:/app/uploads
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  postgres_data:
+  uploads_data:
