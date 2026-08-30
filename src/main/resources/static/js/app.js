@@ -17,6 +17,29 @@
   }
   const PAGE = inferPage();
 
+  var LOGO_SVG =
+    '<svg class="brand-mark" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+    + '<defs>'
+    +   '<linearGradient id="dmdoc" x1="0" y1="0" x2="1" y2="1">'
+    +     '<stop offset="0%" stop-color="#3C4157"/><stop offset="100%" stop-color="#262A3A"/></linearGradient>'
+    +   '<linearGradient id="dmring" x1="0" y1="0" x2="1" y2="1">'
+    +     '<stop offset="0%" stop-color="#2DD4BF"/><stop offset="100%" stop-color="#0D9488"/></linearGradient>'
+    + '</defs>'
+    + '<rect x="2.5" y="9" width="16" height="20" rx="3" fill="url(#dmdoc)"/>'
+    + '<g fill="#fff">'
+    +   '<rect x="5.5" y="13" width="7" height="2.2" rx="1.1" opacity=".9"/>'
+    +   '<rect x="5.5" y="17.5" width="5.2" height="2.2" rx="1.1" opacity=".62"/>'
+    +   '<rect x="5.5" y="22" width="6.2" height="2.2" rx="1.1" opacity=".4"/>'
+    + '</g>'
+    + '<path d="M24.6 11.4 L28.4 7.6" stroke="#262A3A" stroke-width="4.4" stroke-linecap="round"/>'
+    + '<circle cx="29.4" cy="6.6" r="2.1" fill="#262A3A"/>'
+    + '<circle cx="20" cy="16" r="7" fill="#E4F2EE"/>'
+    + '<circle cx="20" cy="16" r="7" fill="none" stroke="url(#dmring)" stroke-width="2.8"/>'
+    + '<g fill="#262A3A">'
+    +   '<rect x="16" y="13.9" width="8" height="2.3" rx="1.15"/>'
+    +   '<rect x="16" y="17.9" width="5.4" height="2.3" rx="1.15"/>'
+    + '</g></svg>';
+
   const PAGE_TITLES = {
     index: 'DocuMorph',
     'sign-in': 'Sign In',
@@ -138,32 +161,38 @@
       { href: 'org-forum.html',  icon: '&#9825;',  label: 'Forum'      }
     ];
     var navItems = nav.map(function (n) {
-      var active = location.pathname.endsWith(n.href) ? ' nav-item--active' : '';
-      return '<a href="' + n.href + '" class="nav-item' + active + '"><span class="nav-icon">' + n.icon + '</span><span class="nav-label">' + esc(n.label) + '</span></a>';
+      var active = location.pathname.endsWith(n.href) ? ' nav-pill--active' : '';
+      return '<a href="' + n.href + '" class="nav-pill' + active + '">'
+        + '<span class="nav-ico">' + n.icon + '</span>'
+        + '<span class="nav-label">' + esc(n.label) + '</span></a>';
     }).join('');
 
     var email = me ? me.email : '';
     var orgName = (me && me.organizationName) ? me.organizationName : '';
 
     app.innerHTML =
-      '<div class="shell">'
-      + '<aside class="sidebar" id="sidebar">'
-      +   '<div class="sidebar-brand"><span class="brand-logo">DM</span><span class="brand-name">DocuMorph</span></div>'
-      +   '<nav class="sidebar-nav">' + navItems + '</nav>'
-      +   '<div class="sidebar-footer">'
-      +     '<div class="user-badge"><span class="user-avatar"></span>'
-      +     '<div class="user-info"><span class="user-email"></span><span class="user-org"></span></div></div>'
-      +     '<button class="btn-icon" id="signout-btn" title="Sign out">&#8594;</button>'
+      '<div class="app">'
+      + '<header class="appbar">'
+      +   '<div class="appbar-row">'
+      +     '<a href="home.html" class="brand">' + LOGO_SVG + '<span class="brand-name">DocuMorph</span></a>'
+      +     '<nav class="nav-rail">' + navItems + '</nav>'
+      +     '<div class="appbar-right">'
+      +       '<div class="topbar-actions" id="topbar-actions"></div>'
+      +       '<button class="user-pill" id="user-pill" aria-label="Account menu">'
+      +         '<span class="user-pill-bars">&#9776;</span>'
+      +         '<span class="user-avatar"></span>'
+      +       '</button>'
+      +     '</div>'
       +   '</div>'
-      + '</aside>'
-      + '<div class="shell-body">'
-      +   '<header class="topbar">'
-      +     '<button class="mobile-menu-btn" id="mobile-menu-btn">&#9776;</button>'
-      +     '<h1 class="topbar-title">' + esc(PAGE_TITLES[PAGE] || '') + '</h1>'
-      +     '<div class="topbar-actions" id="topbar-actions"></div>'
-      +   '</header>'
-      +   '<main class="main-content" id="main-content"><div class="main-inner"></div></main>'
+      + '</header>'
+      + '<div class="user-menu" id="user-menu" hidden>'
+      +   '<div class="user-menu-head"><span class="user-email"></span><span class="user-org"></span></div>'
+      +   '<button class="user-menu-item" id="signout-btn">Sign out</button>'
       + '</div>'
+      + '<main class="app-main" id="main-content">'
+      +   '<div class="page-head"><h1 class="page-title">' + esc(PAGE_TITLES[PAGE] || '') + '</h1></div>'
+      +   '<div class="main-inner"></div>'
+      + '</main>'
       + '</div>';
 
     var avatarEl = app.querySelector('.user-avatar');
@@ -171,20 +200,28 @@
     var orgEl    = app.querySelector('.user-org');
     if (avatarEl) avatarEl.textContent = email ? email.charAt(0).toUpperCase() : '?';
     if (emailEl)  emailEl.textContent  = email;
-    if (orgEl)    orgEl.textContent    = orgName;
+    if (orgEl)    orgEl.textContent    = orgName || 'Personal workspace';
 
-    // sign out
+    var pill = document.getElementById('user-pill');
+    var menu = document.getElementById('user-menu');
+    if (pill && menu) {
+      pill.addEventListener('click', function (e) {
+        e.stopPropagation();
+        menu.hidden = !menu.hidden;
+      });
+      document.addEventListener('click', function (e) {
+        if (!menu.hidden && !menu.contains(e.target)) menu.hidden = true;
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') menu.hidden = true;
+      });
+    }
+
+
     var soBtn = document.getElementById('signout-btn');
     if (soBtn) soBtn.addEventListener('click', function () {
       window.api.clearSession();
       location.href = 'sign-in.html';
-    });
-
-    // mobile sidebar toggle
-    var mmBtn = document.getElementById('mobile-menu-btn');
-    var sidebar = document.getElementById('sidebar');
-    if (mmBtn && sidebar) mmBtn.addEventListener('click', function () {
-      sidebar.classList.toggle('sidebar--open');
     });
   }
 
@@ -201,7 +238,7 @@
 
       /* ── Header ── */
       + '<header class="lp-header">'
-      +   '<div class="landing-brand"><span class="brand-logo">DM</span><span class="brand-name">DocuMorph</span></div>'
+      +   '<div class="landing-brand">' + LOGO_SVG + '<span class="brand-name">DocuMorph</span></div>'
       +   '<nav class="lp-nav">'
       +     '<a href="#how-it-works" class="lp-nav-link">How it works</a>'
       +     '<a href="#features" class="lp-nav-link">Features</a>'
@@ -409,7 +446,7 @@
     app.innerHTML =
       '<div class="auth-layout">'
       + '<div class="auth-showcase"><div class="auth-showcase-inner">'
-      +   '<span class="brand-logo brand-logo--lg">DM</span>'
+      +   '<span class="brand-mark-lg">' + LOGO_SVG + '</span>'
       +   '<h2>Welcome back</h2><p>Continue where you left off.</p>'
       + '</div></div>'
       + '<div class="auth-form-wrap"><div class="auth-form-inner">'
@@ -461,7 +498,7 @@
     app.innerHTML =
       '<div class="auth-layout">'
       + '<div class="auth-showcase"><div class="auth-showcase-inner">'
-      +   '<span class="brand-logo brand-logo--lg">DM</span>'
+      +   '<span class="brand-mark-lg">' + LOGO_SVG + '</span>'
       +   '<h2>Get started free</h2><p>Create your account in seconds.</p>'
       + '</div></div>'
       + '<div class="auth-form-wrap"><div class="auth-form-inner">'
@@ -513,7 +550,7 @@
     app.innerHTML =
       '<div class="auth-layout">'
       + '<div class="auth-showcase"><div class="auth-showcase-inner">'
-      +   '<span class="brand-logo brand-logo--lg">DM</span>'
+      +   '<span class="brand-mark-lg">' + LOGO_SVG + '</span>'
       +   '<h2>One more step</h2><p>Tell us how you plan to use DocuMorph.</p>'
       + '</div></div>'
       + '<div class="auth-form-wrap"><div class="auth-form-inner">'
@@ -937,7 +974,7 @@
     }).join('');
 
     mc.innerHTML =
-      '<div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-bottom:1rem;">'
+      '<div style="display:flex;justify-content:flex-end;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;">'
       +   '<button type="button" class="btn btn--ghost btn--sm" id="export-json-btn">Export JSON</button>'
       +   '<button type="button" class="btn btn--ghost btn--sm" id="export-csv-btn">Export CSV</button>'
       + '</div>'
@@ -1063,7 +1100,7 @@
     var mc = mainContent();
 
     mc.innerHTML =
-      '<div class="search-bar-wrap" style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">'
+      '<div class="search-bar-wrap" style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">'
       +   '<input type="text" id="search-input" placeholder="Search across your documents\u2026" style="flex:1;padding:0.65rem 0.875rem;border:1.5px solid var(--border-2);border-radius:var(--radius-sm);font-size:0.9rem;font-family:inherit;" />'
       +   '<button type="button" class="btn btn--primary" id="search-btn">Search</button>'
       + '</div>'
