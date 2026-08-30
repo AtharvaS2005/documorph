@@ -521,3 +521,32 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   .processing-wrap { padding: 1.4rem; }
   .result-header .btn { flex: 1; }
 }
+
+/* ═══════════ STATIC DOCUMENT PAGES ═══════════ */
+.doc-public { min-height: 100vh; background: var(--bg); }
+.doc-public-inner { max-width: 820px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+
+.doc-prose { max-width: 820px; font-size: 0.95rem; color: var(--ink-2); line-height: 1.75; }
+.doc-prose h2 { font-size: 1.22rem; font-weight: 700; color: var(--ink); letter-spacing: -0.02em; margin: 2.4rem 0 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--line); }
+.doc-prose h3 { font-size: 1rem; font-weight: 700; color: var(--ink); margin: 1.5rem 0 0.5rem; }
+.doc-prose p { margin-bottom: 0.95rem; }
+.doc-prose ul { margin: 0 0 1.1rem 1.2rem; }
+.doc-prose li { margin-bottom: 0.45rem; }
+.doc-prose strong { color: var(--ink); font-weight: 600; }
+.doc-prose .mono { background: var(--bg-3); padding: 0.12rem 0.42rem; border-radius: 5px; font-size: 0.86em; color: var(--ink); }
+.doc-updated { font-size: 0.85rem; color: var(--muted); margin-bottom: 1.75rem; }
+
+.doc-callout { background: var(--brand-soft); border: 1px solid var(--brand-line); border-left: 3px solid var(--brand); border-radius: var(--r-sm); padding: 1.1rem 1.25rem; margin: 1.5rem 0 2rem; font-size: 0.92rem; }
+.doc-callout--warn { background: var(--amber-soft); border-color: rgba(180,83,9,0.28); border-left-color: var(--amber); }
+
+.doc-table { width: 100%; border-collapse: collapse; margin: 0.5rem 0 1.4rem; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
+.doc-table th { text-align: left; padding: 0.7rem 0.95rem; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); background: var(--bg-2); border-bottom: 1px solid var(--line); }
+.doc-table td { padding: 0.75rem 0.95rem; font-size: 0.9rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+.doc-table tr:last-child td { border-bottom: none; }
+
+.lp-footer-nav { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+@media (max-width: 600px) {
+  .doc-public-inner { padding: 1.75rem 1.1rem 3rem; }
+  .doc-prose h2 { font-size: 1.1rem; margin-top: 1.9rem; }
+}
