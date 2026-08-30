@@ -53,7 +53,9 @@
     search: 'Search',
     categories: 'Categories',
     records: 'Record Sets',
-    'org-forum': 'Forum'
+    'org-forum': 'Forum',
+    terms: 'Terms of Service',
+    guide: 'Usage Guide'
   };
   if (PAGE_TITLES[PAGE]) document.title = PAGE_TITLES[PAGE] + ' \u2014 DocuMorph';
 
@@ -187,6 +189,8 @@
       + '</header>'
       + '<div class="user-menu" id="user-menu" hidden>'
       +   '<div class="user-menu-head"><span class="user-email"></span><span class="user-org"></span></div>'
+      +   '<a href="guide.html" class="user-menu-item">Usage Guide</a>'
+      +   '<a href="terms.html" class="user-menu-item">Terms of Service</a>'
       +   '<button class="user-menu-item" id="signout-btn">Sign out</button>'
       + '</div>'
       + '<main class="app-main" id="main-content">'
@@ -421,14 +425,14 @@
       + '</section>'
 
       /* ── Footer ── */
-      + '<footer class="lp-footer">'
       +   '<div class="lp-footer-inner">'
-      +     '<div class="landing-brand"><span class="brand-logo">DM</span><span class="brand-name">DocuMorph</span></div>'
+      +     '<div class="landing-brand">' + LOGO_SVG + '<span class="brand-name">DocuMorph</span></div>'
+      +     '<nav class="lp-footer-nav">'
+      +       '<a href="guide.html" class="lp-nav-link">Usage Guide</a>'
+      +       '<a href="terms.html" class="lp-nav-link">Terms of Service</a>'
+      +     '</nav>'
       +     '<p class="lp-footer-copy">&#169; 2026 DocuMorph &mdash; Intelligent Document Processing Platform</p>'
       +   '</div>'
-      + '</footer>'
-
-      + '</div>';
 
     app.querySelectorAll('a[href^="#"]').forEach(function (a) {
       a.addEventListener('click', function (e) {
@@ -1860,6 +1864,243 @@
   }
 
 
+  /* ═══════════════════════════════════════════════════════
+     STATIC DOCUMENT PAGES
+  ═══════════════════════════════════════════════════════ */
+  async function renderStaticPage(bodyHTML) {
+    // readable signed-out (terms must be viewable before signup)
+    if (window.api.getToken()) {
+      var me = await ensureMe();
+      renderShell(me);
+      mainContent().innerHTML = bodyHTML;
+      return;
+    }
+    app.innerHTML =
+      '<div class="doc-public">'
+      + '<header class="lp-header">'
+      +   '<a href="index.html" class="landing-brand">' + LOGO_SVG + '<span class="brand-name">DocuMorph</span></a>'
+      +   '<nav class="lp-nav">'
+      +     '<a href="terms.html" class="lp-nav-link">Terms</a>'
+      +     '<a href="guide.html" class="lp-nav-link">Guide</a>'
+      +     '<a href="sign-in.html" class="btn btn--ghost">Sign In</a>'
+      +   '</nav>'
+      + '</header>'
+      + '<div class="doc-public-inner">'
+      +   '<h1 class="page-title" style="margin-bottom:1.5rem">' + esc(PAGE_TITLES[PAGE] || '') + '</h1>'
+      +   bodyHTML
+      + '</div>'
+      + '</div>';
+  }
+
+  function termsPage() {
+    renderStaticPage(
+      '<div class="doc-prose">'
+      + '<p class="doc-updated">Last updated: 30 August 2026</p>'
+
+      + '<div class="doc-callout"><strong>Plain summary.</strong> DocuMorph reads your documents and pulls out '
+      + 'structured data. Your documents stay on the server running this software and are processed by local '
+      + 'models — nothing is sent to an external AI service. Extraction is automated and <em>will</em> sometimes '
+      + 'be wrong, so check anything that matters. You can delete your data at any time.</div>'
+
+      + '<h2>1. Acceptance</h2>'
+      + '<p>By creating an account or using DocuMorph ("the Service"), you agree to these terms. If you do not '
+      + 'agree, do not use the Service.</p>'
+
+      + '<h2>2. What the Service does</h2>'
+      + '<p>DocuMorph accepts documents you upload, performs optical character recognition and table detection on '
+      + 'them, and uses a language model to produce summaries or extract named fields. Extracted text is indexed '
+      + 'so you can search across your documents.</p>'
+
+      + '<h2>3. Accounts and workspaces</h2>'
+      + '<p>You are responsible for your account credentials and for activity under your account. Each account '
+      + 'receives a private workspace; documents and extractions are visible only within that workspace.</p>'
+      + '<p>Organization accounts can invite others using an invite code. <strong>Anyone holding a valid invite '
+      + 'code can join that organization</strong> and gain access to its shared forum. Treat invite codes as '
+      + 'sensitive and regenerate or rotate them if one is exposed.</p>'
+
+      + '<h2>4. Your content</h2>'
+      + '<p>You retain all rights to the documents you upload and to the data extracted from them. You grant the '
+      + 'Service only the permission technically required to store, process, index and display that content back '
+      + 'to you.</p>'
+      + '<p>You confirm that you have the right to upload each document and that doing so does not breach any '
+      + 'confidentiality obligation, contract, or law that applies to you.</p>'
+
+      + '<h2>5. How your documents are handled</h2>'
+      + '<ul>'
+      +   '<li>Uploaded files are written to disk on the server running the Service and referenced by your session.</li>'
+      +   '<li>Text extraction and language-model inference run <strong>locally</strong>. Document contents are not '
+      +   'transmitted to any third-party AI provider.</li>'
+      +   '<li>Extracted text is split into chunks, converted into numerical embeddings, and stored in a vector '
+      +   'database scoped to your workspace so that search works.</li>'
+      +   '<li>Deleting a session removes its database records, its files from disk, and its entries from the '
+      +   'search index.</li>'
+      + '</ul>'
+
+      + '<h2>6. Accuracy — please read</h2>'
+      + '<p>Extraction is automated and <strong>is not guaranteed to be accurate or complete</strong>. Known '
+      + 'limitations include:</p>'
+      + '<ul>'
+      +   '<li>Optical character recognition can misread poor scans, unusual fonts, or handwriting.</li>'
+      +   '<li>Table structure may be reconstructed incorrectly, particularly where one logical row spans several '
+      +   'printed lines.</li>'
+      +   '<li>The language model may return an empty value for a field that is present, or occasionally produce a '
+      +   'value not supported by the document.</li>'
+      + '</ul>'
+      + '<p><strong>Do not rely on extracted output for financial, legal, medical, or other consequential '
+      + 'decisions without verifying it against the original document.</strong> The Service is a drafting and '
+      + 'review aid, not a system of record.</p>'
+
+      + '<h2>7. Acceptable use</h2>'
+      + '<p>You may not use the Service to:</p>'
+      + '<ul>'
+      +   '<li>upload material you have no right to process, or that is unlawful;</li>'
+      +   '<li>attempt to access another user\u2019s workspace, documents, or extractions;</li>'
+      +   '<li>probe, scan, or disrupt the Service or the infrastructure it runs on;</li>'
+      +   '<li>submit volumes intended to exhaust processing capacity or storage.</li>'
+      + '</ul>'
+
+      + '<h2>8. Availability and limits</h2>'
+      + '<p>The Service is provided on an "as is" and "as available" basis with no uptime commitment. Documents '
+      + 'are processed one at a time and a single document commonly takes 15\u201320 minutes; concurrent uploads '
+      + 'queue rather than run in parallel. File type and size limits apply and may change without notice.</p>'
+
+      + '<h2>9. Deletion and retention</h2>'
+      + '<p>You may delete any session at any time, which removes the stored file, its extraction records, and its '
+      + 'search index entries. Backups, where taken, may retain deleted content for a limited period before being '
+      + 'overwritten.</p>'
+
+      + '<h2>10. Third-party components</h2>'
+      + '<p>The Service is built on open-source components including PaddleOCR, DocTR, Table Transformer, '
+      + 'DeepSeek-OCR, BAAI/bge-m3, Qdrant, and models served through Ollama. These are governed by their own '
+      + 'licences. Their inclusion does not imply endorsement by their authors.</p>'
+
+      + '<h2>11. Limitation of liability</h2>'
+      + '<p>To the fullest extent permitted by law, the operators of the Service are not liable for any indirect, '
+      + 'incidental, or consequential loss, nor for any loss of data, profit, or opportunity arising from your use '
+      + 'of the Service or from reliance on its output.</p>'
+
+      + '<h2>12. Changes</h2>'
+      + '<p>These terms may be updated. Continued use after a change constitutes acceptance of the revised terms. '
+      + 'The date at the top reflects the most recent revision.</p>'
+
+      + '<h2>13. Contact</h2>'
+      + '<p>Questions about these terms should be directed to the operator of this deployment.</p>'
+
+      + '<div class="doc-callout doc-callout--warn"><strong>Note.</strong> This document is a template written for '
+      + 'a project deployment. It is not legal advice. Have it reviewed by a qualified professional before relying '
+      + 'on it commercially or in a jurisdiction with specific data-protection requirements.</div>'
+      + '</div>'
+    );
+  }
+
+  function guidePage() {
+    renderStaticPage(
+      '<div class="doc-prose">'
+      + '<p class="doc-updated">A practical guide to getting good results.</p>'
+
+      + '<h2>1. What you can upload</h2>'
+      + '<p>Supported types: <span class="mono">PDF, DOCX, TXT, PNG, JPG, JPEG, TIF, TIFF</span>. Maximum 50 MB '
+      + 'per file. Anything else is rejected before processing starts.</p>'
+      + '<p>Three kinds of document are handled differently, automatically:</p>'
+      + '<ul>'
+      +   '<li><strong>Digital PDFs</strong> \u2014 text is read directly. Fastest and most accurate.</li>'
+      +   '<li><strong>Printer scans</strong> \u2014 deskewed, then read with OCR.</li>'
+      +   '<li><strong>Phone photos</strong> \u2014 perspective-corrected and shadow-reduced before OCR. Hardest '
+      +   'case; results improve markedly with a flat, evenly lit, in-focus photo.</li>'
+      + '</ul>'
+
+      + '<h2>2. Choosing an extraction mode</h2>'
+      + '<table class="doc-table"><thead><tr><th>Mode</th><th>Use it when</th></tr></thead><tbody>'
+      + '<tr><td><strong>Full Text</strong></td><td>You want the whole document cleaned up and readable.</td></tr>'
+      + '<tr><td><strong>Summary</strong></td><td>You want three to five sentences describing the document.</td></tr>'
+      + '<tr><td><strong>Key Insights</strong></td><td>You want the main facts and figures as bullet points.</td></tr>'
+      + '<tr><td><strong>Custom Fields</strong></td><td>You want specific named values, or an answer to a question.</td></tr>'
+      + '</tbody></table>'
+      + '<p>The Custom Prompt box only appears \u2014 and is only used \u2014 when the mode is <strong>Custom '
+      + 'Fields</strong>. Filling it in under any other mode has no effect.</p>'
+
+      + '<h2>3. Writing a good custom prompt</h2>'
+      + '<p>There are exactly two shapes, and the wording decides which one you get.</p>'
+
+      + '<h3>A list of fields</h3>'
+      + '<p><span class="mono">Extract: invoice_number, invoice_date, total_amount</span></p>'
+      + '<p>Returns one key per field. Rules that decide whether your text is read as a list:</p>'
+      + '<ul>'
+      +   '<li>Separate fields with commas.</li>'
+      +   '<li>Keep each field to <strong>four words or fewer</strong>.</li>'
+      +   '<li>Use no <span class="mono">. ? ! ; :</span> inside a field name \u2014 a single full stop pushes the '
+      +   'whole prompt into question mode.</li>'
+      + '</ul>'
+      + '<p>Field names are treated as <em>concepts</em>, not literal search strings. Asking for '
+      + '<span class="mono">total_amount</span> will find a line labelled "Grand Total" or "Net Amount". You can '
+      + 'also ask for something the document implies rather than states \u2014 '
+      + '<span class="mono">area_of_expertise</span> on a CV \u2014 and it will be inferred from the content.</p>'
+
+      + '<h3>A direct question</h3>'
+      + '<p><span class="mono">Which line item has the highest value?</span></p>'
+      + '<p>Returns a single <span class="mono">answer</span>. Use this for comparisons, totals, and anything '
+      + 'needing reasoning across rows. You cannot mix a field list and a question in one prompt \u2014 the whole '
+      + 'prompt is treated as one or the other.</p>'
+
+      + '<h2>4. Categories</h2>'
+      + '<p>A category is a saved template: extraction mode, summary style, and custom prompt stored together. '
+      + 'Choose <strong>Category Run</strong> when uploading and every file inherits those settings, so you are not '
+      + 're-typing the same prompt for every invoice.</p>'
+      + '<ul>'
+      +   '<li><strong>Document</strong> type \u2014 each upload is independent.</li>'
+      +   '<li><strong>Record</strong> type \u2014 extractions accumulate into a record set over time.</li>'
+      + '</ul>'
+
+      + '<h2>5. Record sets</h2>'
+      + '<p>Create one from a Record-type category, then run documents against that category. Each completed '
+      + 'extraction is appended automatically. One record set per category.</p>'
+      + '<ul>'
+      +   '<li><strong>Document-wise</strong> \u2014 one entry per file, kept separate.</li>'
+      +   '<li><strong>Consolidated</strong> \u2014 field values merged across every file, so you can see all '
+      +   'invoice numbers together.</li>'
+      + '</ul>'
+
+      + '<h2>6. Search</h2>'
+      + '<p>Search combines meaning-based matching with exact-term matching, so both "seller address" and a '
+      + 'specific invoice number work. Only documents that finished processing are searchable.</p>'
+      + '<p>Results below a relevance threshold are hidden rather than padding the list. If a document you deleted '
+      + 'still appears, use <strong>Rebuild search index</strong> on the Search page.</p>'
+
+      + '<h2>7. How long it takes</h2>'
+      + '<p>Roughly <strong>15\u201320 minutes per document</strong>, dominated by OCR and table detection. '
+      + 'Documents are processed <strong>one at a time</strong> \u2014 uploading five means the fifth starts after '
+      + 'the first four finish. The progress bar reflects real per-page progress; if it appears stuck, the page is '
+      + 'genuinely still being processed.</p>'
+      + '<p>Uploading the same document again because it "seems stuck" just adds another job to the back of the '
+      + 'queue and makes everything slower.</p>'
+
+      + '<h2>8. When something fails</h2>'
+      + '<ul>'
+      +   '<li>A failed job shows a <strong>Retry</strong> button on the results page \u2014 no need to re-upload.</li>'
+      +   '<li>"No text or tables could be extracted" usually means the file is corrupt, empty, or an image with no '
+      +   'legible text.</li>'
+      +   '<li>If a field returns empty, open the <strong>Extracted Text</strong> tab first. If the value is not '
+      +   'there, OCR missed it and no prompt will recover it.</li>'
+      + '</ul>'
+
+      + '<h2>9. Known limitations</h2>'
+      + '<ul>'
+      +   '<li>A table row printed across several lines can be split into multiple rows. Values are captured but '
+      +   'may be grouped oddly.</li>'
+      +   '<li>The language model occasionally returns nothing for a field that is present, or a value the document '
+      +   'does not support.</li>'
+      +   '<li>Handwriting and low-resolution scans are unreliable.</li>'
+      + '</ul>'
+      + '<p><strong>Always check extracted values against the original before acting on them.</strong> Use '
+      + '<em>View original</em> on the results page to compare side by side.</p>'
+
+      + '<h2>10. Working as a team</h2>'
+      + '<p>Organization accounts share a forum. The invite code is shown on the Forum page \u2014 anyone with it '
+      + 'can join your organization, so share it deliberately.</p>'
+      + '</div>'
+    );
+  }
+
 
 
   /* ═══════════════════════════════════════════════════════
@@ -1878,7 +2119,9 @@
     search: searchPage,
     categories:  categoriesPage,
     records:     recordsPage,
-    'org-forum': forumPage
+    'org-forum': forumPage,
+    terms:       termsPage,
+    guide:       guidePage,
   };
 
   document.addEventListener('DOMContentLoaded', function () {
