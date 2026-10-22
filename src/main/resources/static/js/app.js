@@ -898,6 +898,37 @@
     document.getElementById('sid-label').textContent = sessionId;
 
     var pollTimer = null;
+    // jobId -> {t, p}: first time we saw the job moving, to estimate its speed
+    var firstSeen = {};
+
+    function fmtDuration(ms) {
+      var sec = Math.max(0, Math.round(ms / 1000));
+      var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+      if (h) return h + 'h ' + m + 'm';
+      if (m) return m + 'm ' + String(s).padStart(2, '0') + 's';
+      return s + 's';
+    }
+
+    function jobFraction(j) {
+      if (j.status === 'COMPLETED' || j.status === 'FAILED') return 1;
+      if (j.status === 'PROCESSING') return Math.min(1, Math.max(0, j.progress || 0));
+      return 0;
+    }
+
+    // Per-document duration: measured speed of the running job if we have
+    // one, otherwise the average of jobs that already finished.
+    function estimatePerDoc(jobs, now) {
+      var running = jobs.filter(function (j) { return j.status === 'PROCESSING'; })[0];
+      if (running && firstSeen[running.jobId]) {
+        var f = firstSeen[running.jobId];
+        var dp = (running.progress || 0) - f.p;
+        if (dp > 0.02) return (now - f.t) / dp;
+      }
+      var done = jobs.filter(function (j) { return j.status === 'COMPLETED' && j.startedAt && j.completedAt; });
+      if (!done.length) return null;
+      var total = done.reduce(function (acc, j) { return acc + (new Date(j.completedAt) - new Date(j.startedAt)); }, 0);
+      return total / done.length;
+    }
 
     async function poll() {
       var status;
@@ -908,30 +939,60 @@
         if (statusEl2) statusEl2.textContent = 'Error: ' + e.message;
         return;
       }
+      var now = Date.now();
       var jobs = status.jobs || [];
       var total = jobs.length || status.totalFiles || 0;
       var sumProgress = 0;
       jobs.forEach(function (j) {
-        if (j.status === 'COMPLETED' || j.status === 'FAILED') sumProgress += 1;
-        else if (j.status === 'PROCESSING') sumProgress += (j.progress || 0);
+        sumProgress += jobFraction(j);
+        if (j.status === 'PROCESSING' && !firstSeen[j.jobId]) firstSeen[j.jobId] = { t: now, p: j.progress || 0 };
       });
       var pct = total > 0 ? Math.round((sumProgress / total) * 100) : 0;
-    
+      var finished = jobs.filter(function (j) { return j.status === 'COMPLETED' || j.status === 'FAILED'; }).length;
+
+      var starts = jobs.map(function (j) { return j.startedAt ? new Date(j.startedAt).getTime() : null; })
+        .filter(function (t) { return t; });
+      var elapsed = starts.length ? now - Math.min.apply(null, starts) : null;
+
+      // the worker runs one document at a time, so remaining work adds up
+      var perDoc = estimatePerDoc(jobs, now);
+      var remaining = null;
+      if (perDoc) {
+        remaining = jobs.reduce(function (acc, j) { return acc + (1 - jobFraction(j)) * perDoc; }, 0);
+      }
+
       var barEl     = document.getElementById('progress-bar');
       var statusEl  = document.getElementById('proc-status');
       var jobListEl = document.getElementById('job-list');
       if (barEl)    barEl.style.width = pct + '%';
-      if (statusEl) statusEl.textContent = pct + '% complete \u2014 this can take 15\u201320 minutes per document.';
+      if (statusEl) {
+        var parts = [pct + '% complete', finished + ' of ' + total + ' document' + (total === 1 ? '' : 's') + ' done'];
+        if (elapsed != null) parts.push(fmtDuration(elapsed) + ' elapsed');
+        parts.push(remaining != null && remaining > 0
+          ? 'about ' + fmtDuration(remaining) + ' left'
+          : 'estimating time left…');
+        statusEl.textContent = parts.join(' · ');
+      }
       if (jobs.length && jobListEl) {
         jobListEl.innerHTML = jobs.map(function (j) {
-          return '<div class="job-row"><span class="job-name mono">' + esc(j.fileName || j.fileId || '') + '</span>' + statusChipHTML(j.status) + '</div>';
+          var jp = Math.round(jobFraction(j) * 100);
+          var detail = j.status === 'QUEUED' ? 'Waiting in queue'
+            : j.status === 'PROCESSING' ? jp + '%'
+            : j.status === 'COMPLETED' ? 'Done' + (j.startedAt && j.completedAt ? ' in ' + fmtDuration(new Date(j.completedAt) - new Date(j.startedAt)) : '')
+            : '';
+          return '<div class="job-row job-row--progress">'
+            + '<div class="job-row-top"><span class="job-name mono">' + esc(j.fileName || j.fileId || '') + '</span>'
+            +   '<span class="job-row-meta"><span class="job-pct">' + esc(detail) + '</span>' + statusChipHTML(j.status) + '</span></div>'
+            + '<div class="job-bar-wrap"><div class="job-bar job-bar--' + esc(String(j.status || '').toLowerCase()) + '" style="width:' + jp + '%"></div></div>'
+            + (j.status === 'FAILED' && j.failureReason ? '<p class="job-error">' + esc(j.failureReason) + '</p>' : '')
+            + '</div>';
         }).join('');
       }
-    
+
       var allTerminal = jobs.length > 0 && jobs.every(function (j) { return j.status === 'COMPLETED' || j.status === 'FAILED'; });
       if (allTerminal) {
         clearInterval(pollTimer);
-        if (statusEl) statusEl.textContent = 'Done! Redirecting to results\u2026';
+        if (statusEl) statusEl.textContent = 'Done! Redirecting to results…';
         setTimeout(function () { location.href = 'results.html?id=' + encodeURIComponent(sessionId); }, 1500);
       }
     }

@@ -361,6 +361,16 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .processing-status { font-size: 0.9rem; color: var(--muted); margin-bottom: 1.6rem; }
 .job-list { display: flex; flex-direction: column; gap: 0.55rem; }
 .job-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.76rem 1rem; background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-sm); animation: slideIn 0.2s var(--ease) both; }
+.job-row--progress { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+.job-row-top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-width: 0; }
+.job-row-top .job-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.job-row-meta { display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0; }
+.job-pct { font-size: 0.78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.job-bar-wrap { height: 6px; background: var(--bg-3); border-radius: 99px; overflow: hidden; }
+.job-bar { height: 100%; background: var(--brand-grad); border-radius: 99px; transition: width 0.6s var(--spring); }
+.job-bar--completed { background: var(--ok); }
+.job-bar--failed { background: var(--rose); }
+.job-error { margin: 0; font-size: 0.78rem; color: var(--rose); }
 .job-name { font-size: 0.85rem; color: var(--ink-2); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ═══════════ RESULTS ═══════════ */
