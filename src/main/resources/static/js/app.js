@@ -740,6 +740,7 @@
     +       '<textarea id="custom-prompt" rows="3" placeholder="Extract: invoice_number, total_amount, date"></textarea>'
     +       '<p class="form-hint">Only used when Extraction Mode is \u201cCustom Fields\u201d. Either list the fields to pull out, e.g. <span class="mono">Extract: invoice_number, total_amount, date</span> \u2014 or ask a direct question, e.g. <span class="mono">Which item has the highest price?</span></p></div>'
     +   '</div>'
+    +   '<div id="pipeline-offline" class="form-error" hidden></div>'
     +   '<div id="upload-error" class="form-error" hidden></div>'
     +   '<button type="button" class="btn btn--primary btn--full" id="start-btn" disabled>Start Processing</button>'
     + '</div>'
@@ -759,7 +760,24 @@
   extractionModeEl.addEventListener('change', togglePromptField);
   togglePromptField();
   var errEl        = document.getElementById('upload-error');
+  var offlineEl    = document.getElementById('pipeline-offline');
   var selectedFiles = [];
+  var pipelineOnline = true;
+
+  // Re-checked every 15s so the warning clears on its own once the pipeline starts.
+  async function checkPipeline() {
+    var health;
+    try { health = await window.api.get('/pipeline/health'); } catch (e) { return; }
+    pipelineOnline = !!health.online;
+    offlineEl.hidden = pipelineOnline;
+    if (!pipelineOnline) {
+      offlineEl.innerHTML = '<strong>Processing service offline.</strong> ' + esc(health.message || '')
+        + ' Uploads are paused until it is back.';
+    }
+    renderFileList();
+  }
+  checkPipeline();
+  setInterval(checkPipeline, 15000);
 
   browseBtn.addEventListener('click', function () { fileInput.click(); });
   fileInput.addEventListener('change', function () { addFiles(Array.from(fileInput.files)); fileInput.value = ''; });
@@ -793,7 +811,9 @@
         + '<button type="button" class="btn-icon file-remove" data-idx="' + i + '">&#10005;</button>'
         + '</li>';
     }).join('');
-    startBtn.disabled = selectedFiles.length === 0;
+    if (startBtn.textContent === 'Start Processing') {
+      startBtn.disabled = selectedFiles.length === 0 || !pipelineOnline;
+    }
   }
 
   fileList.addEventListener('click', function (e) {
