@@ -1,6 +1,8 @@
 package com.documorph.service;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -91,6 +93,65 @@ public class RecordSetService {
 		return toResponse(recordSet);
 	}
 
+	/**
+	 * Flattens mergedContent into a header-first table: one row per document for
+	 * DOCUMENT_WISE sets, one column per field for CONSOLIDATED sets.
+	 */
+	@Transactional(readOnly = true)
+	public List<List<String>> exportTable(UUID id, String email) {
+		RecordSetResponse rec = getRecordSet(id, email);
+		ObjectNode root = readRoot(rec.getMergedContent());
+		List<List<String>> table = new ArrayList<>();
+
+		if ("CONSOLIDATED".equals(root.path("storageFormat").asText())) {
+			JsonNode fields = root.path("fields");
+			List<String> header = new ArrayList<>();
+			List<List<String>> cols = new ArrayList<>();
+			fields.properties().forEach(e -> {
+				header.add(e.getKey());
+				List<String> col = new ArrayList<>();
+				if (e.getValue().isArray()) {
+					e.getValue().forEach(v -> col.add(cellText(v)));
+				} else {
+					col.add(cellText(e.getValue()));
+				}
+				cols.add(col);
+			});
+			table.add(header);
+			int n = cols.stream().mapToInt(List::size).max().orElse(0);
+			for (int r = 0; r < n; r++) {
+				List<String> row = new ArrayList<>();
+				for (List<String> col : cols) {
+					row.add(r < col.size() ? col.get(r) : "");
+				}
+				table.add(row);
+			}
+		} else {
+			JsonNode docs = root.path("documents");
+			LinkedHashSet<String> keys = new LinkedHashSet<>();
+			docs.forEach(d -> d.path("fields").properties().forEach(e -> keys.add(e.getKey())));
+			List<String> header = new ArrayList<>(List.of("fileName", "processedAt"));
+			header.addAll(keys);
+			table.add(header);
+			docs.forEach(d -> {
+				List<String> row = new ArrayList<>();
+				row.add(d.path("fileName").asText(""));
+				row.add(d.path("processedAt").asText(""));
+				for (String k : keys) {
+					row.add(cellText(d.path("fields").get(k)));
+				}
+				table.add(row);
+			});
+		}
+		return table;
+	}
+
+	private String cellText(JsonNode v) {
+		if (v == null || v.isNull() || v.isMissingNode()) {
+			return "";
+		}
+		return v.isValueNode() ? v.asText() : v.toString();
+	}
 
 	private RecordSetResponse toResponse(RecordSet recordSet) {
 		return RecordSetResponse.builder().id(recordSet.getId()).categoryId(recordSet.getCategory().getId())
