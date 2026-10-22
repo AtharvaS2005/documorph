@@ -1223,6 +1223,10 @@
       return;
     }
 
+    // sessionId -> true; kept outside the table so ticks survive filtering
+    var selected = {};
+    var visible = sessions;
+
     var MODE_LABELS = {
       FULL: 'Full Text', SUMMARY: 'Summary',
       KEY_INSIGHTS: 'Key Insights', CUSTOM_FIELDS: 'Custom Fields'
@@ -1246,6 +1250,7 @@
         return emptyHTML('&#9776;', 'No sessions', 'Start a new session from the Upload page.');
       }
       return '<div class="table-wrap"><table class="data-table"><thead><tr>'
+        + '<th><input type="checkbox" id="select-all" title="Select all" /></th>'
         + '<th>Documents</th><th>Extraction</th><th>Status</th><th>Created</th><th></th><th></th>'
         + '</tr></thead><tbody>'
         + list.map(function (s) {
@@ -1253,6 +1258,8 @@
             var primary = names.length ? names[0] : '(no files)';
             var extra = names.length > 1 ? ' <span class="form-optional">+' + (names.length - 1) + ' more</span>' : '';
             return '<tr>'
+              + '<td><input type="checkbox" class="session-select" data-id="' + esc(s.sessionId) + '"'
+              +   (selected[s.sessionId] ? ' checked' : '') + ' /></td>'
               + '<td><span class="mono" title="' + esc(names.join(', ')) + '">' + esc(primary) + '</span>' + extra + '</td>'
               + '<td>' + describeType(s)
               +   (s.sessionType === 'CATEGORY_RUN' ? ' <span class="form-optional">(category)</span>' : '')
@@ -1282,6 +1289,8 @@
       +     '<option value="SINGLE_SESSION">Single Session</option>'
       +     '<option value="CATEGORY_RUN">Category Run</option>'
       +   '</select>'
+      +   '<button type="button" class="btn btn--ghost btn--sm" id="bulk-csv-btn">Download all as CSV</button>'
+      +   '<button type="button" class="btn btn--ghost btn--sm" id="bulk-xlsx-btn">Download all as Excel</button>'
       + '</div>'
       + '</div>'
       + '<div id="activity-table">' + renderTable(sessions) + '</div>';
@@ -1297,8 +1306,52 @@
         if (name && !fileNames(s).some(function (n) { return n.toLowerCase().indexOf(name) !== -1; })) return false;
         return true;
       });
+      visible = filtered;
       document.getElementById('activity-table').innerHTML = renderTable(filtered);
+      updateBulkButtons();
     }
+
+    // With nothing ticked the buttons export every session currently listed.
+    function exportIds() {
+      var ticked = visible.filter(function (s) { return selected[s.sessionId]; });
+      return (ticked.length ? ticked : visible).map(function (s) { return s.sessionId; });
+    }
+
+    function updateBulkButtons() {
+      var n = visible.filter(function (s) { return selected[s.sessionId]; }).length;
+      document.getElementById('bulk-csv-btn').textContent = n ? 'Download ' + n + ' as CSV' : 'Download all as CSV';
+      document.getElementById('bulk-xlsx-btn').textContent = n ? 'Download ' + n + ' as Excel' : 'Download all as Excel';
+      document.getElementById('bulk-csv-btn').disabled = !visible.length;
+      document.getElementById('bulk-xlsx-btn').disabled = !visible.length;
+      var all = document.getElementById('select-all');
+      if (all) {
+        all.checked = n > 0 && n === visible.length;
+        all.indeterminate = n > 0 && n < visible.length;
+      }
+    }
+
+    function bulkExport(fmt) {
+      var ids = exportIds();
+      if (!ids.length) return;
+      var d = new Date();
+      var stamp = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      downloadExport('/sessions/export?format=' + fmt + '&ids=' + ids.map(encodeURIComponent).join(','),
+        'documorph-export-' + stamp + '.' + fmt);
+    }
+
+    document.getElementById('bulk-csv-btn').addEventListener('click', function () { bulkExport('csv'); });
+    document.getElementById('bulk-xlsx-btn').addEventListener('click', function () { bulkExport('xlsx'); });
+
+    document.getElementById('activity-table').addEventListener('change', function (e) {
+      if (e.target.id === 'select-all') {
+        visible.forEach(function (s) { selected[s.sessionId] = e.target.checked; });
+        document.querySelectorAll('.session-select').forEach(function (cb) { cb.checked = e.target.checked; });
+      } else if (e.target.classList.contains('session-select')) {
+        selected[e.target.dataset.id] = e.target.checked;
+      }
+      updateBulkButtons();
+    });
+    updateBulkButtons();
 
     document.getElementById('filter-status').addEventListener('change', applyFilters);
     document.getElementById('filter-type').addEventListener('change', applyFilters);
@@ -1313,6 +1366,7 @@
       try {
         await window.api.delete('/sessions/' + encodeURIComponent(btn.dataset.id));
         sessions = sessions.filter(function (s) { return s.sessionId !== btn.dataset.id; });
+        delete selected[btn.dataset.id];
         showToast('Session deleted.', 'success');
         applyFilters();
       } catch (err) {
