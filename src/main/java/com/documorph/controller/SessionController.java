@@ -1,5 +1,6 @@
 package com.documorph.controller;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -85,6 +86,17 @@ public class SessionController {
 		return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON)
 				.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"session-" + id + ".json\"")
 				.body(results);
+	}
+
+	/** Combines the results of several sessions into one CSV or XLSX file. */
+	@GetMapping("/export")
+	public ResponseEntity<?> exportSessions(@RequestParam("ids") List<UUID> ids,
+			@RequestParam(defaultValue = "csv") String format, @AuthenticationPrincipal UserDetails userDetails) {
+		if (!"csv".equalsIgnoreCase(format) && !"xlsx".equalsIgnoreCase(format)) {
+			throw new IllegalArgumentException("Format must be csv or xlsx.");
+		}
+		List<List<String>> table = uploadSessionService.exportSessionsTable(ids, userDetails.getUsername());
+		return tableResponse(table, format, "documorph-export-" + LocalDate.now());
 	}
 
 	static ResponseEntity<?> tableResponse(List<List<String>> table, String format, String baseName) {
