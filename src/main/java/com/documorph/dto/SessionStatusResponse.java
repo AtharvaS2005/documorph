@@ -1,5 +1,6 @@
 package com.documorph.dto;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,5 +31,8 @@ public class SessionStatusResponse {
 		private String errorCode;
 		private String failureReason;
 		private Double progress;
+		/** Latest attempt's start (creation time if never retried). */
+		private OffsetDateTime startedAt;
+		private OffsetDateTime completedAt;
 	}
 }

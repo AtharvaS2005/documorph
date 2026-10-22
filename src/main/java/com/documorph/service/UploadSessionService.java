@@ -178,7 +178,9 @@ public class UploadSessionService {
 
 				jobInfos.add(SessionStatusResponse.JobStatusInfo.builder().jobId(job.getId()).fileId(file.getId())
 						.fileName(file.getFileName()).status(job.getStatus()).errorCode(job.getErrorCode())
-						.failureReason(job.getFailureReason()).progress(job.getProgress()).build());
+						.failureReason(job.getFailureReason()).progress(job.getProgress())
+						.startedAt(job.getStartedAt() != null ? job.getStartedAt() : job.getCreatedAt())
+						.completedAt(job.getCompletedAt()).build());
 			}
 		}
 
