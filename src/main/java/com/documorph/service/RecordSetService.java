@@ -19,6 +19,8 @@ import com.documorph.model.RecordSet;
 import com.documorph.model.User;
 import com.documorph.model.Workspace;
 import com.documorph.repository.CategoryRepository;
+import com.documorph.repository.ExtractionJobRepository;
+import com.documorph.repository.ExtractionOutputRepository;
 import com.documorph.repository.RecordSetRepository;
 import com.documorph.repository.UserRepository;
 import com.documorph.repository.WorkspaceRepository;
@@ -38,6 +40,8 @@ public class RecordSetService {
 	private final WorkspaceRepository workspaceRepository;
 	private final CategoryRepository categoryRepository;
 	private final RecordSetRepository recordSetRepository;
+	private final ExtractionJobRepository extractionJobRepository;
+	private final ExtractionOutputRepository extractionOutputRepository;
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
 	@Transactional
@@ -191,6 +195,63 @@ public class RecordSetService {
 		recordSet.setMergedContent(writeRoot(root));
 		recordSet.setCurrentVersion(recordSet.getCurrentVersion() + 1);
 		recordSetRepository.save(recordSet);
+	}
+
+	/**
+	 * Apply a user's correction of one file's fields. Document-wise sets replace
+	 * that file's entry; consolidated sets are rebuilt from every source file's
+	 * saved fields, since their value lists don't record which file each value
+	 * came from. Adds the file if it was never recorded.
+	 */
+	@Transactional
+	public void updateExtraction(UUID categoryId, UUID fileId, String fileName, String structuredJson,
+			OffsetDateTime processedAt) {
+		List<RecordSet> sets = recordSetRepository.findByCategoryIdOrderByCreatedAtAsc(categoryId);
+		if (sets.isEmpty()) {
+			return;
+		}
+		RecordSet recordSet = sets.get(0);
+		Map<String, Object> fields = parseFields(structuredJson);
+		ObjectNode root = readRoot(recordSet.getMergedContent());
+		String fileIdStr = fileId.toString();
+
+		if (recordSet.getStorageFormat() == Category.StorageFormat.CONSOLIDATED) {
+			ArrayNode sourceIds = arrayAt(root, "sourceFileIds");
+			List<String> ids = new ArrayList<>();
+			sourceIds.forEach(n -> ids.add(n.asText()));
+			if (!ids.contains(fileIdStr)) {
+				ids.add(fileIdStr);
+			}
+			ObjectNode rebuilt = objectMapper.createObjectNode();
+			for (String id : ids) {
+				Map<String, Object> sourceFields = id.equals(fileIdStr) ? fields : savedFields(UUID.fromString(id));
+				mergeConsolidated(rebuilt, UUID.fromString(id), sourceFields);
+			}
+			root = rebuilt;
+		} else {
+			ArrayNode docs = arrayAt(root, "documents");
+			ObjectNode entry = null;
+			for (JsonNode existing : docs) {
+				if (fileIdStr.equals(existing.path("fileId").asText(null)) && existing instanceof ObjectNode obj) {
+					entry = obj;
+				}
+			}
+			if (entry == null) {
+				mergeDocumentWise(root, fileId, fileName, processedAt, fields);
+			} else {
+				entry.set("fields", objectMapper.valueToTree(fields));
+			}
+		}
+
+		recordSet.setMergedContent(writeRoot(root));
+		recordSet.setCurrentVersion(recordSet.getCurrentVersion() + 1);
+		recordSetRepository.save(recordSet);
+	}
+
+	private Map<String, Object> savedFields(UUID fileId) {
+		return extractionJobRepository.findByFileId(fileId)
+				.flatMap(job -> extractionOutputRepository.findByJobId(job.getId()))
+				.map(output -> parseFields(output.getStructuredJson())).orElse(Map.of());
 	}
 
 	private boolean mergeDocumentWise(ObjectNode root, UUID fileId, String fileName, OffsetDateTime processedAt,

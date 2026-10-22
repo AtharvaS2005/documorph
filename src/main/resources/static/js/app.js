@@ -1098,6 +1098,10 @@
       var r = results.results[idx];
       var panel = document.getElementById('results-main');
       if (!r || !panel) return;
+      var fields = parseFields(r.structuredJson);
+      var fieldKeys = fields ? Object.keys(fields) : [];
+      var editable = r.jobStatus === 'COMPLETED' && fieldKeys.length > 0;
+      var firstTab = editable ? 'fields' : 'text';
       panel.innerHTML =
         '<div class="result-header">'
         + '<h3 class="result-filename mono"></h3>'
@@ -1112,23 +1116,27 @@
             : '')
         + '</div>'
         + '<div class="result-tabs">'
-        +   '<button class="result-tab result-tab--active" data-tab="text">Extracted Text</button>'
+        +   (editable ? '<button class="result-tab" data-tab="fields">Fields</button>' : '')
+        +   '<button class="result-tab" data-tab="text">Extracted Text</button>'
         +   '<button class="result-tab" data-tab="json">Structured JSON</button>'
         +   '<button class="result-tab" data-tab="tables">Tables</button>'
         + '</div>'
-        + '<div class="result-pane" id="pane-text"><pre class="result-pre">' + esc(r.extractedText || 'No text output.') + '</pre></div>'
+        + (editable ? '<div class="result-pane" id="pane-fields" hidden>' + fieldsFormHTML(fieldKeys) + '</div>' : '')
+        + '<div class="result-pane" id="pane-text" hidden><pre class="result-pre">' + esc(r.extractedText || 'No text output.') + '</pre></div>'
         + '<div class="result-pane" id="pane-json" hidden><pre class="result-pre">' + esc(prettyJson(r.structuredJson, 'No JSON output.')) + '</pre></div>'
         + '<div class="result-pane" id="pane-tables" hidden>' + renderTablesHTML(r.tables) + '</div>';
         panel.querySelector('.result-filename').textContent = r.fileName;
-      panel.querySelectorAll('.result-tab').forEach(function (tab) {
-        tab.addEventListener('click', function () {
-          panel.querySelectorAll('.result-tab').forEach(function (t) { t.classList.remove('result-tab--active'); });
-          tab.classList.add('result-tab--active');
-          document.getElementById('pane-text').hidden = tab.dataset.tab !== 'text';
-          document.getElementById('pane-json').hidden = tab.dataset.tab !== 'json';
-          document.getElementById('pane-tables').hidden = tab.dataset.tab !== 'tables';
+      function showTab(name) {
+        panel.querySelectorAll('.result-tab').forEach(function (t) {
+          t.classList.toggle('result-tab--active', t.dataset.tab === name);
         });
+        panel.querySelectorAll('.result-pane').forEach(function (p) { p.hidden = p.id !== 'pane-' + name; });
+      }
+      panel.querySelectorAll('.result-tab').forEach(function (tab) {
+        tab.addEventListener('click', function () { showTab(tab.dataset.tab); });
       });
+      showTab(firstTab);
+      if (editable) bindFieldsForm(idx, r, fields);
       var viewBtn = document.getElementById('view-original-btn');
       if (viewBtn) viewBtn.addEventListener('click', async function () {
         try {
@@ -1166,6 +1174,77 @@
           showToast(e.message, 'error');
           retryBtn.disabled = false;
           retryBtn.textContent = 'Retry';
+        }
+      });
+    }
+
+    function parseFields(json) {
+      if (!json) return null;
+      try {
+        var v = JSON.parse(json);
+        return v && typeof v === 'object' && !Array.isArray(v) ? v : null;
+      } catch (e) { return null; }
+    }
+
+    function fieldText(v) {
+      if (v == null) return '';
+      return typeof v === 'object' ? JSON.stringify(v) : String(v);
+    }
+
+    // Inputs are filled after render via .value, so values never touch innerHTML.
+    function fieldsFormHTML(keys) {
+      return '<form class="fields-form" id="fields-form">'
+        + '<p class="form-hint">Check the extracted values against the original and correct any mistakes. '
+        + 'Saving updates this result, its exports and any record set it feeds.</p>'
+        + keys.map(function (k, i) {
+            return '<div class="form-field fields-row"><label class="mono" for="field-' + i + '">' + esc(k) + '</label>'
+              + '<input type="text" id="field-' + i + '" data-key="' + esc(k) + '" placeholder="(empty)" /></div>';
+          }).join('')
+        + '<div class="fields-actions">'
+        +   '<span class="fields-status" id="fields-status"></span>'
+        +   '<button type="button" class="btn btn--ghost btn--sm" id="fields-reset" disabled>Undo changes</button>'
+        +   '<button type="submit" class="btn btn--primary btn--sm" id="fields-save" disabled>Save changes</button>'
+        + '</div>'
+        + '</form>';
+    }
+
+    function bindFieldsForm(idx, r, fields) {
+      var form = document.getElementById('fields-form');
+      var inputs = Array.prototype.slice.call(form.querySelectorAll('input[data-key]'));
+      var saveBtn = document.getElementById('fields-save');
+      var resetBtn = document.getElementById('fields-reset');
+      var statusEl = document.getElementById('fields-status');
+
+      function isChanged(inp) { return inp.value.trim() !== fieldText(fields[inp.dataset.key]); }
+      function fill() { inputs.forEach(function (inp) { inp.value = fieldText(fields[inp.dataset.key]); }); }
+      function refresh() {
+        var n = inputs.filter(isChanged).length;
+        inputs.forEach(function (inp) { inp.classList.toggle('field-input--changed', isChanged(inp)); });
+        saveBtn.disabled = n === 0;
+        resetBtn.disabled = n === 0;
+        statusEl.textContent = n ? n + ' unsaved change' + (n === 1 ? '' : 's') : '';
+      }
+
+      fill();
+      refresh();
+      form.addEventListener('input', refresh);
+      resetBtn.addEventListener('click', function () { fill(); refresh(); });
+      form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var edits = {};
+        inputs.filter(isChanged).forEach(function (inp) { edits[inp.dataset.key] = inp.value.trim(); });
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving\u2026';
+        try {
+          var updated = await window.api.put('/sessions/' + encodeURIComponent(sessionId)
+            + '/files/' + encodeURIComponent(r.fileId) + '/fields', edits);
+          results.results[idx] = Object.assign({}, r, updated);
+          showToast('Fields saved.', 'success');
+          renderResult(idx);
+        } catch (err) {
+          showToast(err.message, 'error');
+          saveBtn.textContent = 'Save changes';
+          refresh();
         }
       });
     }

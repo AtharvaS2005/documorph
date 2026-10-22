@@ -2,6 +2,7 @@ package com.documorph.service;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +53,7 @@ public class UploadSessionService {
 	private final ExtractionOutputRepository extractionOutputRepository;
 	private final FileStorageService fileStorageService;
 	private final PythonPipelineClient pythonPipelineClient;
+	private final RecordSetService recordSetService;
 	private static final Set<String> ALLOWED_EXTENSIONS = Set.of("pdf", "docx", "txt", "png", "jpg", "jpeg", "tif",
 			"tiff");
 	private static final Logger log = LoggerFactory.getLogger(UploadSessionService.class);
@@ -474,6 +476,69 @@ public class UploadSessionService {
 			table.add(row);
 		}
 		return table;
+	}
+
+	/**
+	 * Save a user's corrections to one file's extracted fields. Only fields the
+	 * extraction produced can be changed, and blank values are stored as null.
+	 * If the session ran against a RECORD category, its record set is updated
+	 * to match.
+	 */
+	@Transactional
+	public SessionResultsResponse.FileResult updateFields(UUID sessionId, UUID fileId, Map<String, Object> edits,
+			String email) {
+		User user = userRepository.findByEmail(email)
+				.orElseThrow(() -> new ResourceNotFoundException("User not found."));
+		Workspace workspace = workspaceRepository.findByUserId(user.getId())
+				.orElseThrow(() -> new ResourceNotFoundException("Workspace not found."));
+		UploadSession session = uploadSessionRepository.findById(sessionId)
+				.filter(s -> s.getWorkspace().getId().equals(workspace.getId()))
+				.orElseThrow(() -> new ResourceNotFoundException("Session not found."));
+		FileItem file = fileItemRepository.findById(fileId)
+				.filter(f -> f.getSession().getId().equals(sessionId))
+				.orElseThrow(() -> new ResourceNotFoundException("File not found."));
+		ExtractionJob job = extractionJobRepository.findByFileId(fileId)
+				.filter(j -> j.getStatus() == ExtractionJob.JobStatus.COMPLETED)
+				.orElseThrow(() -> new IllegalArgumentException("Only completed extractions can be edited."));
+		ExtractionOutput output = extractionOutputRepository.findByJobId(job.getId())
+				.orElseThrow(() -> new ResourceNotFoundException("Extraction output not found."));
+
+		Map<String, Object> current = parseJsonObject(output.getStructuredJson());
+		if (current.isEmpty()) {
+			throw new IllegalArgumentException("This result has no fields to edit.");
+		}
+		if (edits == null) {
+			edits = Map.of();
+		}
+		for (String key : edits.keySet()) {
+			if (!current.containsKey(key)) {
+				throw new IllegalArgumentException("Unknown field: " + key);
+			}
+		}
+
+		Map<String, Object> updated = new LinkedHashMap<>(current);
+		edits.forEach((key, value) -> {
+			String text = value == null ? null : String.valueOf(value).trim();
+			updated.put(key, text == null || text.isEmpty() ? null : text);
+		});
+
+		try {
+			output.setStructuredJson(objectMapper.writeValueAsString(updated));
+		} catch (Exception e) {
+			throw new IllegalArgumentException("Could not save fields: " + e.getMessage());
+		}
+		extractionOutputRepository.save(output);
+
+		Category category = session.getCategory();
+		if (category != null && category.getCategoryType() == Category.CategoryType.RECORD) {
+			recordSetService.updateExtraction(category.getId(), file.getId(), file.getFileName(),
+					output.getStructuredJson(), output.getCreatedAt());
+		}
+
+		return SessionResultsResponse.FileResult.builder().fileId(file.getId()).fileName(file.getFileName())
+				.jobId(job.getId()).jobStatus(job.getStatus()).extractedText(output.getExtractedText())
+				.structuredJson(output.getStructuredJson()).tables(output.getTables())
+				.processedAt(output.getCreatedAt()).build();
 	}
 
 	private Map<String, Object> parseJsonObject(String json) {
