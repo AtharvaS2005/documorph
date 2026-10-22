@@ -1479,7 +1479,7 @@
 
     mc.innerHTML =
       '<div class="table-wrap"><table class="data-table"><thead><tr>'
-      + '<th>Category</th><th>Storage Format</th><th>Documents</th><th>Version</th><th>Created</th><th></th><th></th>'
+      + '<th>Category</th><th>Storage Format</th><th>Documents</th><th>Version</th><th>Created</th><th></th><th></th><th></th>'
       + '</tr></thead><tbody>'
       + records.map(function (r, i) {
           var count = 0;
@@ -1494,6 +1494,7 @@
             + '<td>' + esc(r.currentVersion) + '</td>'
             + '<td>' + formatDate(r.createdAt) + '</td>'
             + '<td><button class="btn btn--ghost btn--sm rec-view-btn" data-idx="' + i + '">View</button></td>'
+            + '<td><button class="btn btn--ghost btn--sm rec-csv-btn" data-idx="' + i + '">Export CSV</button></td>'
             + '<td><button class="btn btn--danger btn--sm rec-del-btn" data-id="' + esc(r.id) + '">Delete</button></td>'
             + '</tr>';
         }).join('')
@@ -1508,6 +1509,12 @@
     mc.querySelectorAll('.rec-view-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
         openRecViewModal(records[Number(btn.dataset.idx)]);
+      });
+    });
+
+    mc.querySelectorAll('.rec-csv-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        exportRecordCsv(records[Number(btn.dataset.idx)]);
       });
     });
 
@@ -1597,6 +1604,57 @@
     });
   }
   
+  // Builds the CSV client-side from mergedContent: one row per document for
+  // PER_DOCUMENT sets, one row per value position for CONSOLIDATED sets.
+  function recordToCsv(rec) {
+    var parsed = null;
+    try { parsed = rec.mergedContent ? JSON.parse(rec.mergedContent) : null; } catch (e) { /* ignore */ }
+    if (!parsed) return null;
+
+    function cell(v) {
+      if (v == null) return '""';
+      if (typeof v === 'object') v = JSON.stringify(v);
+      return '"' + String(v).replace(/"/g, '""') + '"';
+    }
+
+    var header, rows = [];
+    if (parsed.storageFormat === 'CONSOLIDATED') {
+      var fields = parsed.fields || {};
+      header = Object.keys(fields);
+      if (!header.length) return null;
+      var cols = header.map(function (k) { return Array.isArray(fields[k]) ? fields[k] : [fields[k]]; });
+      var n = Math.max.apply(null, cols.map(function (c) { return c.length; }));
+      for (var r = 0; r < n; r++) rows.push(cols.map(function (c) { return c[r]; }));
+    } else {
+      var docs = parsed.documents || [];
+      if (!docs.length) return null;
+      var keys = [];
+      docs.forEach(function (d) {
+        Object.keys(d.fields || {}).forEach(function (k) { if (keys.indexOf(k) < 0) keys.push(k); });
+      });
+      header = ['fileName', 'processedAt'].concat(keys);
+      docs.forEach(function (d) {
+        var f = d.fields || {};
+        rows.push([d.fileName, d.processedAt].concat(keys.map(function (k) { return f[k]; })));
+      });
+    }
+    return [header].concat(rows).map(function (row) { return row.map(cell).join(','); }).join('\r\n');
+  }
+
+  function exportRecordCsv(rec) {
+    var csv = recordToCsv(rec);
+    if (!csv) { showToast('Nothing to export yet.', 'error'); return; }
+    var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = (rec.categoryName || 'record-set').replace(/[^\w\-]+/g, '_') + '-v' + rec.currentVersion + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
   function openRecViewModal(rec) {
     var existing = document.getElementById('rec-view-modal');
     if (existing) existing.remove();
@@ -1644,7 +1702,8 @@
       +   '</span> \u00b7 Version ' + esc(rec.currentVersion) + '</p>'
       +   bodyHTML
       + '</div>'
-      + '<div class="modal-footer"><button class="btn btn--ghost" id="rec-view-cancel">Close</button></div>'
+      + '<div class="modal-footer"><button class="btn btn--ghost" id="rec-view-csv">Export CSV</button>'
+      +   '<button class="btn btn--ghost" id="rec-view-cancel">Close</button></div>'
       + '</div>';
     document.body.appendChild(modal);
     modal.querySelector('.rec-view-title').textContent = rec.categoryName || 'Record Set';
@@ -1652,6 +1711,7 @@
     function closeModal() { modal.remove(); }
     document.getElementById('rec-view-close').addEventListener('click', closeModal);
     document.getElementById('rec-view-cancel').addEventListener('click', closeModal);
+    document.getElementById('rec-view-csv').addEventListener('click', function () { exportRecordCsv(rec); });
     modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
   }
 }
