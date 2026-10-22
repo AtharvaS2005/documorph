@@ -786,7 +786,7 @@
     pipelineOnline = !!health.online;
     offlineEl.hidden = pipelineOnline;
     if (!pipelineOnline) {
-      offlineEl.innerHTML = '<strong>Processing service offline.</strong> ' + esc(health.message || '')
+      offlineEl.innerHTML = '<strong>' + esc(health.message || 'The processing service is offline.') + '</strong>'
         + ' Uploads are paused until it is back.';
     }
     renderFileList();
