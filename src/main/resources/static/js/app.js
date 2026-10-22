@@ -79,6 +79,21 @@
     }, 3800);
   }
 
+  /* ── File download ───────────────────────────────────── */
+  async function downloadExport(path, fileName) {
+    try {
+      var blob = await window.api.downloadBlob(path);
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) { showToast(e.message, 'error'); }
+  }
+
   /* ── Date / size helpers ─────────────────────────────── */
   function relativeDate(iso) {
     var diff = Date.now() - new Date(iso).getTime();
@@ -1001,6 +1016,7 @@
       '<div style="display:flex;justify-content:flex-end;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;">'
       +   '<button type="button" class="btn btn--ghost btn--sm" id="export-json-btn">Export JSON</button>'
       +   '<button type="button" class="btn btn--ghost btn--sm" id="export-csv-btn">Export CSV</button>'
+      +   '<button type="button" class="btn btn--ghost btn--sm" id="export-xlsx-btn">Export Excel</button>'
       + '</div>'
       + '<div class="results-layout">'
       + '<aside class="results-sidebar"><ul class="result-file-list" id="result-file-list">' + fileItems + '</ul></aside>'
@@ -1008,23 +1024,14 @@
       + '</div>';
 
     function bindExport(btnId, fmt, ext) {
-      document.getElementById(btnId).addEventListener('click', async function () {
-        try {
-          var blob = await window.api.downloadBlob(
-            '/sessions/' + encodeURIComponent(sessionId) + '/export?format=' + fmt);
-          var url = URL.createObjectURL(blob);
-          var a = document.createElement('a');
-          a.href = url;
-          a.download = 'session-' + sessionId + '.' + ext;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          URL.revokeObjectURL(url);
-        } catch (e) { showToast(e.message, 'error'); }
+      document.getElementById(btnId).addEventListener('click', function () {
+        downloadExport('/sessions/' + encodeURIComponent(sessionId) + '/export?format=' + fmt,
+          'session-' + sessionId + '.' + ext);
       });
     }
     bindExport('export-json-btn', 'json', 'json');
     bindExport('export-csv-btn', 'csv', 'csv');
+    bindExport('export-xlsx-btn', 'xlsx', 'xlsx');
 
     function renderResult(idx) {
       var r = results.results[idx];
@@ -1499,7 +1506,7 @@
 
     mc.innerHTML =
       '<div class="table-wrap"><table class="data-table"><thead><tr>'
-      + '<th>Category</th><th>Storage Format</th><th>Documents</th><th>Version</th><th>Created</th><th></th><th></th><th></th>'
+      + '<th>Category</th><th>Storage Format</th><th>Documents</th><th>Version</th><th>Created</th><th></th><th></th><th></th><th></th>'
       + '</tr></thead><tbody>'
       + records.map(function (r, i) {
           var count = 0;
@@ -1514,7 +1521,8 @@
             + '<td>' + esc(r.currentVersion) + '</td>'
             + '<td>' + formatDate(r.createdAt) + '</td>'
             + '<td><button class="btn btn--ghost btn--sm rec-view-btn" data-idx="' + i + '">View</button></td>'
-            + '<td><button class="btn btn--ghost btn--sm rec-csv-btn" data-idx="' + i + '">Export CSV</button></td>'
+            + '<td><button class="btn btn--ghost btn--sm rec-csv-btn" data-idx="' + i + '" data-fmt="csv">Export CSV</button></td>'
+            + '<td><button class="btn btn--ghost btn--sm rec-csv-btn" data-idx="' + i + '" data-fmt="xlsx">Export Excel</button></td>'
             + '<td><button class="btn btn--danger btn--sm rec-del-btn" data-id="' + esc(r.id) + '">Delete</button></td>'
             + '</tr>';
         }).join('')
@@ -1534,7 +1542,7 @@
 
     mc.querySelectorAll('.rec-csv-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        exportRecordCsv(records[Number(btn.dataset.idx)]);
+        exportRecord(records[Number(btn.dataset.idx)], btn.dataset.fmt);
       });
     });
 
@@ -1624,55 +1632,10 @@
     });
   }
   
-  // Builds the CSV client-side from mergedContent: one row per document for
-  // PER_DOCUMENT sets, one row per value position for CONSOLIDATED sets.
-  function recordToCsv(rec) {
-    var parsed = null;
-    try { parsed = rec.mergedContent ? JSON.parse(rec.mergedContent) : null; } catch (e) { /* ignore */ }
-    if (!parsed) return null;
-
-    function cell(v) {
-      if (v == null) return '""';
-      if (typeof v === 'object') v = JSON.stringify(v);
-      return '"' + String(v).replace(/"/g, '""') + '"';
-    }
-
-    var header, rows = [];
-    if (parsed.storageFormat === 'CONSOLIDATED') {
-      var fields = parsed.fields || {};
-      header = Object.keys(fields);
-      if (!header.length) return null;
-      var cols = header.map(function (k) { return Array.isArray(fields[k]) ? fields[k] : [fields[k]]; });
-      var n = Math.max.apply(null, cols.map(function (c) { return c.length; }));
-      for (var r = 0; r < n; r++) rows.push(cols.map(function (c) { return c[r]; }));
-    } else {
-      var docs = parsed.documents || [];
-      if (!docs.length) return null;
-      var keys = [];
-      docs.forEach(function (d) {
-        Object.keys(d.fields || {}).forEach(function (k) { if (keys.indexOf(k) < 0) keys.push(k); });
-      });
-      header = ['fileName', 'processedAt'].concat(keys);
-      docs.forEach(function (d) {
-        var f = d.fields || {};
-        rows.push([d.fileName, d.processedAt].concat(keys.map(function (k) { return f[k]; })));
-      });
-    }
-    return [header].concat(rows).map(function (row) { return row.map(cell).join(','); }).join('\r\n');
-  }
-
-  function exportRecordCsv(rec) {
-    var csv = recordToCsv(rec);
-    if (!csv) { showToast('Nothing to export yet.', 'error'); return; }
-    var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = (rec.categoryName || 'record-set').replace(/[^\w\-]+/g, '_') + '-v' + rec.currentVersion + '.csv';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+  function exportRecord(rec, fmt) {
+    if (!rec.mergedContent) { showToast('Nothing to export yet.', 'error'); return; }
+    var base = (rec.categoryName || 'record-set').replace(/[^\w\-]+/g, '_') + '-v' + rec.currentVersion;
+    downloadExport('/record-sets/' + encodeURIComponent(rec.id) + '/export?format=' + fmt, base + '.' + fmt);
   }
 
   function openRecViewModal(rec) {
@@ -1723,6 +1686,7 @@
       +   bodyHTML
       + '</div>'
       + '<div class="modal-footer"><button class="btn btn--ghost" id="rec-view-csv">Export CSV</button>'
+      +   '<button class="btn btn--ghost" id="rec-view-xlsx">Export Excel</button>'
       +   '<button class="btn btn--ghost" id="rec-view-cancel">Close</button></div>'
       + '</div>';
     document.body.appendChild(modal);
@@ -1731,7 +1695,8 @@
     function closeModal() { modal.remove(); }
     document.getElementById('rec-view-close').addEventListener('click', closeModal);
     document.getElementById('rec-view-cancel').addEventListener('click', closeModal);
-    document.getElementById('rec-view-csv').addEventListener('click', function () { exportRecordCsv(rec); });
+    document.getElementById('rec-view-csv').addEventListener('click', function () { exportRecord(rec, 'csv'); });
+    document.getElementById('rec-view-xlsx').addEventListener('click', function () { exportRecord(rec, 'xlsx'); });
     modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
   }
 }

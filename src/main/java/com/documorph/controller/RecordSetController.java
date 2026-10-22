@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.documorph.dto.RecordSetRequest;
@@ -44,6 +45,19 @@ public class RecordSetController {
 	public ResponseEntity<RecordSetResponse> getRecordSet(@PathVariable("id") UUID id,
 			@AuthenticationPrincipal UserDetails userDetails) {
 		return ResponseEntity.ok(recordSetService.getRecordSet(id, userDetails.getUsername()));
+	}
+
+	@GetMapping("/{id}/export")
+	public ResponseEntity<?> exportRecordSet(@PathVariable("id") UUID id,
+			@RequestParam(defaultValue = "csv") String format, @AuthenticationPrincipal UserDetails userDetails) {
+		if (!"csv".equalsIgnoreCase(format) && !"xlsx".equalsIgnoreCase(format)) {
+			throw new IllegalArgumentException("Format must be csv or xlsx.");
+		}
+		RecordSetResponse rec = recordSetService.getRecordSet(id, userDetails.getUsername());
+		String baseName = (rec.getCategoryName() == null ? "record-set" : rec.getCategoryName())
+				.replaceAll("[^\\w\\-]+", "_") + "-v" + rec.getCurrentVersion();
+		return SessionController.tableResponse(recordSetService.exportTable(id, userDetails.getUsername()), format,
+				baseName);
 	}
 
 	@DeleteMapping("/{id}")

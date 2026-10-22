@@ -410,39 +410,68 @@ public class UploadSessionService {
 
 	/**
 	 * One row per file: fileName, status, then the union of all extracted field
-	 * names.
+	 * names. With several sessions a leading sessionId column says where each row
+	 * came from. Text-only results (FULL, SUMMARY, KEY_INSIGHTS) have no fields,
+	 * so an extractedText column is added when any row lacks them.
 	 */
 	@Transactional(readOnly = true)
-	public String exportSessionCsv(UUID sessionId, String email) {
-		SessionResultsResponse results = getSessionResults(sessionId, email);
+	public List<List<String>> exportSessionsTable(List<UUID> sessionIds, String email) {
+		if (sessionIds == null || sessionIds.isEmpty()) {
+			throw new IllegalArgumentException("Select at least one session to export.");
+		}
+		boolean multi = sessionIds.size() > 1;
 
-		List<Map<String, Object>> rows = new ArrayList<>();
+		List<UUID> rowSessions = new ArrayList<>();
+		List<SessionResultsResponse.FileResult> rowResults = new ArrayList<>();
+		List<Map<String, Object>> rowFields = new ArrayList<>();
 		LinkedHashSet<String> columns = new LinkedHashSet<>();
-		for (SessionResultsResponse.FileResult r : results.getResults()) {
-			Map<String, Object> fields = parseJsonObject(r.getStructuredJson());
-			rows.add(fields);
-			columns.addAll(fields.keySet());
+		boolean needsText = false;
+
+		for (UUID sessionId : new LinkedHashSet<>(sessionIds)) {
+			for (SessionResultsResponse.FileResult r : getSessionResults(sessionId, email).getResults()) {
+				Map<String, Object> fields = parseJsonObject(r.getStructuredJson());
+				rowSessions.add(sessionId);
+				rowResults.add(r);
+				rowFields.add(fields);
+				columns.addAll(fields.keySet());
+				if (fields.isEmpty() && r.getExtractedText() != null) {
+					needsText = true;
+				}
+			}
 		}
 
-		StringBuilder sb = new StringBuilder();
-		sb.append(csvCell("fileName")).append(',').append(csvCell("status"));
-		for (String c : columns) {
-			sb.append(',').append(csvCell(c));
+		List<List<String>> table = new ArrayList<>();
+		List<String> header = new ArrayList<>();
+		if (multi) {
+			header.add("sessionId");
 		}
-		sb.append('\n');
+		header.add("fileName");
+		header.add("status");
+		header.addAll(columns);
+		if (needsText) {
+			header.add("extractedText");
+		}
+		table.add(header);
 
-		for (int i = 0; i < results.getResults().size(); i++) {
-			SessionResultsResponse.FileResult r = results.getResults().get(i);
-			Map<String, Object> fields = rows.get(i);
-			sb.append(csvCell(r.getFileName())).append(',')
-					.append(csvCell(r.getJobStatus() == null ? "" : r.getJobStatus().name()));
+		for (int i = 0; i < rowResults.size(); i++) {
+			SessionResultsResponse.FileResult r = rowResults.get(i);
+			Map<String, Object> fields = rowFields.get(i);
+			List<String> row = new ArrayList<>();
+			if (multi) {
+				row.add(rowSessions.get(i).toString());
+			}
+			row.add(r.getFileName());
+			row.add(r.getJobStatus() == null ? "" : r.getJobStatus().name());
 			for (String c : columns) {
 				Object v = fields.get(c);
-				sb.append(',').append(csvCell(v == null ? "" : String.valueOf(v)));
+				row.add(v == null ? "" : String.valueOf(v));
 			}
-			sb.append('\n');
+			if (needsText) {
+				row.add(fields.isEmpty() && r.getExtractedText() != null ? r.getExtractedText() : "");
+			}
+			table.add(row);
 		}
-		return sb.toString();
+		return table;
 	}
 
 	private Map<String, Object> parseJsonObject(String json) {
@@ -455,13 +484,5 @@ public class UploadSessionService {
 		} catch (Exception e) {
 			return Map.of();
 		}
-	}
-
-	/** Always quote: simplest correct handling of commas, quotes and newlines. */
-	private String csvCell(String value) {
-		if (value == null) {
-			return "\"\"";
-		}
-		return "\"" + value.replace("\"", "\"\"") + "\"";
 	}
 }

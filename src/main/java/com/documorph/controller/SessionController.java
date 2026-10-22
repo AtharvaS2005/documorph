@@ -21,6 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.documorph.dto.SessionResponse;
 import com.documorph.dto.SessionResultsResponse;
 import com.documorph.dto.SessionStatusResponse;
+import com.documorph.service.TabularExport;
 import com.documorph.service.UploadSessionService;
 
 import lombok.RequiredArgsConstructor;
@@ -75,11 +76,9 @@ public class SessionController {
 	public ResponseEntity<?> exportSession(@PathVariable UUID id, @RequestParam(defaultValue = "json") String format,
 			@AuthenticationPrincipal UserDetails userDetails) {
 
-		if ("csv".equalsIgnoreCase(format)) {
-			String csv = uploadSessionService.exportSessionCsv(id, userDetails.getUsername());
-			return ResponseEntity.ok().contentType(MediaType.parseMediaType("text/csv"))
-					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"session-" + id + ".csv\"")
-					.body(csv);
+		if ("csv".equalsIgnoreCase(format) || "xlsx".equalsIgnoreCase(format)) {
+			List<List<String>> table = uploadSessionService.exportSessionsTable(List.of(id), userDetails.getUsername());
+			return tableResponse(table, format, "session-" + id);
 		}
 
 		SessionResultsResponse results = uploadSessionService.getSessionResults(id, userDetails.getUsername());
@@ -87,4 +86,18 @@ public class SessionController {
 				.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"session-" + id + ".json\"")
 				.body(results);
 	}
+
+	static ResponseEntity<?> tableResponse(List<List<String>> table, String format, String baseName) {
+		if ("xlsx".equalsIgnoreCase(format)) {
+			return ResponseEntity.ok().contentType(XLSX)
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + baseName + ".xlsx\"")
+					.body(TabularExport.toXlsx(table, "Results"));
+		}
+		return ResponseEntity.ok().contentType(MediaType.parseMediaType("text/csv"))
+				.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + baseName + ".csv\"")
+				.body(TabularExport.toCsv(table));
+	}
+
+	private static final MediaType XLSX = MediaType
+			.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 }
