@@ -19,6 +19,7 @@ import com.documorph.dto.SessionResponse;
 import com.documorph.dto.SessionResultsResponse;
 import com.documorph.dto.SessionStatusResponse;
 import com.documorph.exception.ResourceNotFoundException;
+import com.documorph.exception.ServiceUnavailableException;
 import com.documorph.model.Category;
 import com.documorph.model.ExtractionJob;
 import com.documorph.model.ExtractionOutput;
@@ -62,6 +63,7 @@ public class UploadSessionService {
 			String summaryStyleStr, String customPrompt, List<MultipartFile> files, String email) {
 
 		validateFiles(files);
+		requirePipelineOnline();
 		User user = userRepository.findByEmail(email)
 				.orElseThrow(() -> new ResourceNotFoundException("User not found."));
 		Workspace workspace = workspaceRepository.findByUserId(user.getId())
@@ -378,6 +380,7 @@ public class UploadSessionService {
 			throw new IllegalArgumentException("Only failed jobs can be retried.");
 		}
 
+		requirePipelineOnline();
 		String pythonJobId;
 		try {
 			pythonJobId = pythonPipelineClient.submitDocument(file.getFilePath(), job.getExtractionMode().name(),
@@ -395,6 +398,14 @@ public class UploadSessionService {
 		job.setStartedAt(OffsetDateTime.now());
 		job.setRetryCount(job.getRetryCount() == null ? 1 : job.getRetryCount() + 1);
 		extractionJobRepository.save(job);
+	}
+
+	/** Rejects uploads up front rather than storing files whose jobs can only fail. */
+	private void requirePipelineOnline() {
+		Map<String, Object> health = pythonPipelineClient.checkHealth();
+		if (!Boolean.TRUE.equals(health.get("online"))) {
+			throw new ServiceUnavailableException(String.valueOf(health.get("message")));
+		}
 	}
 
 	/**
