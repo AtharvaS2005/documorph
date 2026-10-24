@@ -3,13 +3,18 @@ package com.documorph.controller;
 import java.util.List;
 import java.util.Map;
 
+import jakarta.validation.Valid;
+
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.documorph.dto.ChatRequest;
+import com.documorph.dto.ChatResponse;
 import com.documorph.dto.SearchResultResponse;
 import com.documorph.service.SearchService;
 import com.documorph.service.UploadSessionService;
@@ -27,6 +32,12 @@ public class SearchController {
 	public Map<String, Integer> reindex(@AuthenticationPrincipal UserDetails userDetails) {
 		int indexed = uploadSessionService.reindexWorkspace(userDetails.getUsername());
 		return Map.of("indexed", indexed);
+	}
+
+	@PostMapping("/api/search/chat")
+	public ChatResponse chat(@Valid @RequestBody ChatRequest request,
+			@AuthenticationPrincipal UserDetails userDetails) {
+		return searchService.chat(request.getQuestion(), userDetails.getUsername());
 	}
 
 	@GetMapping("/api/search")

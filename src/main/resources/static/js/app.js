@@ -1271,14 +1271,138 @@
     var mc = mainContent();
 
     mc.innerHTML =
-      '<div class="search-bar-wrap" style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">'
+      '<div class="result-tabs search-tabs">'
+      +   '<button class="result-tab result-tab--active" data-tab="chat">Ask your documents</button>'
+      +   '<button class="result-tab" data-tab="search">Search passages</button>'
+      + '</div>'
+      + '<div class="result-pane" id="pane-chat">'
+      +   '<div class="chat-panel">'
+      +     '<div class="chat-log" id="chat-log" aria-live="polite">'
+      +       '<div class="chat-empty" id="chat-empty">'
+      +         '<p class="chat-empty-title">Ask a question about your uploaded documents</p>'
+      +         '<p class="form-hint">Answers come only from your own files and show which passages they used. '
+      +         'Each question is answered on its own.</p>'
+      +         '<div class="chat-suggestions">'
+      +           '<button type="button" class="btn btn--ghost btn--sm chat-suggest">What is the total on each invoice?</button>'
+      +           '<button type="button" class="btn btn--ghost btn--sm chat-suggest">Who are the invoices billed to?</button>'
+      +         '</div>'
+      +       '</div>'
+      +     '</div>'
+      +     '<form class="chat-form" id="chat-form">'
+      +       '<textarea id="chat-input" rows="2" maxlength="1000" placeholder="e.g. What was the total on invoice INV-1001?"></textarea>'
+      +       '<button type="submit" class="btn btn--primary" id="chat-send">Ask</button>'
+      +     '</form>'
+      +   '</div>'
+      + '</div>'
+      + '<div class="result-pane" id="pane-search" hidden>'
+      + '<div class="search-bar-wrap" style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">'
       +   '<input type="text" id="search-input" placeholder="Search across your documents\u2026" style="flex:1;padding:0.65rem 0.875rem;border:1.5px solid var(--border-2);border-radius:var(--radius-sm);font-size:0.9rem;font-family:inherit;" />'
       +   '<button type="button" class="btn btn--primary" id="search-btn">Search</button>'
       + '</div>'
       + '<div style="display:flex;justify-content:flex-end;margin-bottom:1.25rem;">'
       +   '<button type="button" class="btn btn--ghost btn--sm" id="reindex-btn">Rebuild search index</button>'
       + '</div>'
-      + '<div id="search-results"></div>';
+      + '<div id="search-results"></div>'
+      + '</div>';
+
+    mc.querySelectorAll('.search-tabs .result-tab').forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        mc.querySelectorAll('.search-tabs .result-tab').forEach(function (t) {
+          t.classList.toggle('result-tab--active', t === tab);
+        });
+        document.getElementById('pane-chat').hidden = tab.dataset.tab !== 'chat';
+        document.getElementById('pane-search').hidden = tab.dataset.tab !== 'search';
+      });
+    });
+
+    var chatLog = document.getElementById('chat-log');
+    var chatForm = document.getElementById('chat-form');
+    var chatInput = document.getElementById('chat-input');
+    var chatSend = document.getElementById('chat-send');
+
+    function appendBubble(cls) {
+      var empty = document.getElementById('chat-empty');
+      if (empty) empty.remove();
+      var el = document.createElement('div');
+      el.className = 'chat-msg ' + cls;
+      chatLog.appendChild(el);
+      chatLog.scrollTop = chatLog.scrollHeight;
+      return el;
+    }
+
+    // Escapes first, then turns [n] markers that point at a real passage into chips.
+    function answerHTML(answer, passages) {
+      var known = {};
+      passages.forEach(function (p) { known[p.number] = true; });
+      return esc(answer).replace(/\[(\d+)\]/g, function (m, n) {
+        return known[n] ? '<button type="button" class="cite-chip" data-n="' + n + '">' + n + '</button>' : m;
+      });
+    }
+
+    function renderAnswer(el, res) {
+      var passages = res.passages || [];
+      var used = (res.sources || []).filter(function (n) {
+        return passages.some(function (p) { return p.number === n; });
+      });
+      var shown = passages.filter(function (p) { return used.indexOf(p.number) !== -1; });
+      el.innerHTML = '<div class="chat-answer">' + answerHTML(res.answer || '', passages) + '</div>'
+        + (shown.length
+          ? '<div class="chat-sources"><p class="chat-sources-title">Sources</p>'
+            + shown.map(function (p) {
+                return '<details class="chat-source" data-n="' + p.number + '">'
+                  + '<summary><span class="cite-chip cite-chip--static">' + p.number + '</span>'
+                  + '<span class="mono chat-source-name"></span></summary>'
+                  + '<p class="chat-source-text"></p>'
+                  + (p.sessionId ? '<a class="btn-link" href="results.html?id=' + encodeURIComponent(p.sessionId) + '">Open document results</a>' : '')
+                  + '</details>';
+              }).join('')
+            + '</div>'
+          : '');
+      shown.forEach(function (p) {
+        var d = el.querySelector('.chat-source[data-n="' + p.number + '"]');
+        d.querySelector('.chat-source-name').textContent = p.fileName || 'Unknown file';
+        d.querySelector('.chat-source-text').textContent = p.text || '';
+      });
+      el.querySelectorAll('button.cite-chip').forEach(function (chip) {
+        chip.addEventListener('click', function () {
+          var d = el.querySelector('.chat-source[data-n="' + chip.dataset.n + '"]');
+          if (!d) return;
+          d.open = true;
+          d.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        });
+      });
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    async function ask(question) {
+      question = (question || '').trim();
+      if (!question || chatSend.disabled) return;
+      appendBubble('chat-msg--user').textContent = question;
+      chatInput.value = '';
+      chatSend.disabled = true;
+      var bot = appendBubble('chat-msg--bot chat-msg--pending');
+      bot.textContent = 'Reading your documents\u2026';
+      try {
+        var res = await window.api.post('/search/chat', { question: question });
+        bot.classList.remove('chat-msg--pending');
+        renderAnswer(bot, res);
+      } catch (e) {
+        bot.classList.remove('chat-msg--pending');
+        bot.classList.add('chat-msg--error');
+        bot.textContent = e.message;
+      } finally {
+        chatSend.disabled = false;
+        chatInput.focus();
+      }
+    }
+
+    chatForm.addEventListener('submit', function (e) { e.preventDefault(); ask(chatInput.value); });
+    chatInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(chatInput.value); }
+    });
+    mc.querySelectorAll('.chat-suggest').forEach(function (b) {
+      b.addEventListener('click', function () { ask(b.textContent); });
+    });
 
     var input = document.getElementById('search-input');
     var btn = document.getElementById('search-btn');
