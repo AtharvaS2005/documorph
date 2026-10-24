@@ -624,3 +624,9 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .page-preview-zoom .page-preview-label { min-width: 3rem; }
 .page-preview-bar { justify-content: flex-start; flex-wrap: wrap; }
 .page-frame { max-width: none; }
+
+/* Copy buttons */
+.copy-row { display: flex; justify-content: flex-end; margin-bottom: 0.5rem; }
+.field-copy { flex-shrink: 0; width: 2rem; height: 2rem; border-radius: var(--r-sm); border: 1px solid var(--line-2); background: var(--surface); color: var(--muted); font-size: 0.95rem; line-height: 1; cursor: pointer; }
+.field-copy:hover, .field-copy:focus-visible { color: var(--brand-deep); border-color: var(--brand-line); }
+.field-copy.is-copied, .copy-btn.is-copied { color: var(--ok); border-color: var(--ok); }
