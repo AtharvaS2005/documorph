@@ -26,5 +26,7 @@ public class SessionResultsResponse {
 		private String structuredJson;
 		private OffsetDateTime processedAt;
 		private String tables;
+		/** JSON: where each field was found on the original page, for highlighting. */
+		private String fieldLocations;
 	}
 }

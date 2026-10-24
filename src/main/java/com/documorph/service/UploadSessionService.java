@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -247,6 +248,7 @@ public class UploadSessionService {
 					.extractedText(output != null ? output.getExtractedText() : null)
 					.structuredJson(output != null ? output.getStructuredJson() : null)
 					.tables(output != null ? output.getTables() : null)
+					.fieldLocations(output != null ? output.getFieldLocations() : null)
 					.processedAt(output != null ? output.getCreatedAt() : null).build());
 		}
 
@@ -524,6 +526,7 @@ public class UploadSessionService {
 
 		try {
 			output.setStructuredJson(objectMapper.writeValueAsString(updated));
+			output.setFieldLocations(dropLocations(output.getFieldLocations(), current, updated));
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Could not save fields: " + e.getMessage());
 		}
@@ -538,7 +541,28 @@ public class UploadSessionService {
 		return SessionResultsResponse.FileResult.builder().fileId(file.getId()).fileName(file.getFileName())
 				.jobId(job.getId()).jobStatus(job.getStatus()).extractedText(output.getExtractedText())
 				.structuredJson(output.getStructuredJson()).tables(output.getTables())
+				.fieldLocations(output.getFieldLocations())
 				.processedAt(output.getCreatedAt()).build();
+	}
+
+	/**
+	 * A corrected value is no longer the text that was found on the page, so
+	 * its highlight would point at the wrong thing. Drop the location of every
+	 * field whose value changed; unchanged fields keep theirs.
+	 */
+	private String dropLocations(String locationsJson, Map<String, Object> before, Map<String, Object> after)
+			throws Exception {
+		Map<String, Object> locations = parseJsonObject(locationsJson);
+		if (locations.isEmpty()) {
+			return locationsJson;
+		}
+		Map<String, Object> kept = new LinkedHashMap<>(locations);
+		for (String key : after.keySet()) {
+			if (!Objects.equals(String.valueOf(before.get(key)), String.valueOf(after.get(key)))) {
+				kept.remove(key);
+			}
+		}
+		return objectMapper.writeValueAsString(kept);
 	}
 
 	private Map<String, Object> parseJsonObject(String json) {

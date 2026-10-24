@@ -25,6 +25,7 @@ dependencies {
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
 	implementation 'com.fasterxml.jackson.core:jackson-databind'
 	implementation 'org.apache.poi:poi-ooxml:5.4.1'
+	implementation 'org.apache.pdfbox:pdfbox:3.0.3'
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'org.postgresql:postgresql'
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'

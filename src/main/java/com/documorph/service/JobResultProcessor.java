@@ -154,6 +154,7 @@ public class JobResultProcessor {
 		output.setExtractedText(textObj != null ? String.valueOf(textObj) : null);
 		output.setStructuredJson(toJsonString(result.get("structuredJson")));
 		output.setTables(toJsonString(result.get("tables")));
+		output.setFieldLocations(toJsonString(result.get("fieldLocations")));
 		extractionOutputRepository.save(output);
 	}
 
