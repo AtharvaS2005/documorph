@@ -45,8 +45,9 @@ public class PagePreviewService {
 	}
 
 	public boolean isImage(FileItem file) {
+		// browsers can't display TIFF, so those have no preview
 		return switch (extension(file)) {
-		case "png", "jpg", "jpeg", "gif", "webp", "bmp" -> true;
+		case "png", "jpg", "jpeg" -> true;
 		default -> false;
 		};
 	}
@@ -73,8 +74,7 @@ public class PagePreviewService {
 				throw new ResourceNotFoundException("Page not found.");
 			}
 			try (InputStream in = fileStorageService.loadAsResource(file.getFilePath()).getInputStream()) {
-				String type = file.getMimeType() != null ? file.getMimeType() : "image/" + extension(file);
-				return new PageImage(in.readAllBytes(), type);
+				return new PageImage(in.readAllBytes(), FileTypes.forFileName(file.getFileName()));
 			} catch (IOException e) {
 				throw new ResourceNotFoundException("File could not be read.");
 			}

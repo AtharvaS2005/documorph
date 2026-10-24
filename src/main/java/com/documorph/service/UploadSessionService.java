@@ -119,7 +119,7 @@ public class UploadSessionService {
 				String storedPath = fileStorageService.store(finalSession.getId(), file);
 
 				FileItem fileItem = FileItem.builder().session(finalSession).fileName(file.getOriginalFilename())
-						.fileSize(file.getSize()).mimeType(file.getContentType()).filePath(storedPath).build();
+						.fileSize(file.getSize()).mimeType(FileTypes.forFileName(file.getOriginalFilename())).filePath(storedPath).build();
 				fileItem = fileItemRepository.save(fileItem);
 
 				Category.ExtractionMode mode = finalCategory != null ? finalCategory.getDefaultExtractionMode()

@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.documorph.model.FileItem;
 import com.documorph.service.FileStorageService;
+import com.documorph.service.FileTypes;
 import com.documorph.service.PagePreviewService;
 import com.documorph.service.UploadSessionService;
 
@@ -38,18 +39,15 @@ public class FileController {
 		FileItem file = uploadSessionService.getOwnedFile(fileId, userDetails.getUsername());
 		Resource resource = fileStorageService.loadAsResource(file.getFilePath());
 
-		MediaType contentType;
-		try {
-			contentType = file.getMimeType() != null ? MediaType.parseMediaType(file.getMimeType())
-					: MediaType.APPLICATION_OCTET_STREAM;
-		} catch (Exception e) {
-			contentType = MediaType.APPLICATION_OCTET_STREAM;
-		}
+		// by extension, never the stored type: older rows hold whatever the uploader's browser claimed
+		MediaType contentType = MediaType.parseMediaType(FileTypes.forFileName(file.getFileName()));
 
 		String disposition = (download ? "attachment" : "inline") + "; filename=\""
 				+ file.getFileName().replace("\"", "") + "\"";
 
+		// If the file is ever opened directly, it gets no scripts and no access to the site.
 		return ResponseEntity.ok().contentType(contentType).header(HttpHeaders.CONTENT_DISPOSITION, disposition)
+				.header("Content-Security-Policy", "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox")
 				.body(resource);
 	}
 
