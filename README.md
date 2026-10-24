@@ -158,6 +158,8 @@ All routes require a `Authorization: Bearer <token>` header except signup and lo
 | `DELETE` | `/api/sessions/{id}` | Remove session, files and vectors |
 | `POST` | `/api/sessions/jobs/{jobId}/retry` | Resubmit a failed job |
 | `GET` | `/api/files/{fileId}` | Download an original upload |
+| `GET` | `/api/files/{fileId}/pages` | How many pages can be previewed |
+| `GET` | `/api/files/{fileId}/pages/{n}` | Page `n` as an image (PDFs rendered with PDFBox) |
 | `GET` | `/api/pipeline/health` | Whether the processing service can accept jobs |
 
 ### Categories and record sets

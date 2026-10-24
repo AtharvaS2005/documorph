@@ -48,6 +48,11 @@ public class ExtractionOutput {
 	@Column(name = "tables", columnDefinition = "jsonb")
 	private String tables;
 
+	/** {field: {page, box: [x0, y0, x1, y1] normalised 0-1, matched, method}}; null if never located. */
+	@JdbcTypeCode(SqlTypes.JSON)
+	@Column(name = "field_locations", columnDefinition = "jsonb")
+	private String fieldLocations;
+
 	@CreationTimestamp
 	@Column(name = "created_at", updatable = false)
 	private OffsetDateTime createdAt;
