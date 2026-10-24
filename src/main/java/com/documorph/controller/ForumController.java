@@ -3,6 +3,8 @@ package com.documorph.controller;
 import java.util.List;
 import java.util.UUID;
 
+import jakarta.validation.Valid;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,7 +32,7 @@ public class ForumController {
 	private final ForumService forumService;
 
 	@PostMapping
-	public ResponseEntity<ForumPostResponse> createPost(@RequestBody ForumPostRequest request,
+	public ResponseEntity<ForumPostResponse> createPost(@Valid @RequestBody ForumPostRequest request,
 			@AuthenticationPrincipal UserDetails userDetails) {
 		return ResponseEntity.status(HttpStatus.CREATED)
 				.body(forumService.createPost(request, userDetails.getUsername()));
@@ -49,7 +51,7 @@ public class ForumController {
 
 	@PostMapping("/{id}/replies")
 	public ResponseEntity<ForumReplyResponse> createReply(@PathVariable("id") UUID id,
-			@RequestBody ForumReplyRequest request, @AuthenticationPrincipal UserDetails userDetails) {
+			@Valid @RequestBody ForumReplyRequest request, @AuthenticationPrincipal UserDetails userDetails) {
 		return ResponseEntity.status(HttpStatus.CREATED)
 				.body(forumService.createReply(id, request, userDetails.getUsername()));
 	}
