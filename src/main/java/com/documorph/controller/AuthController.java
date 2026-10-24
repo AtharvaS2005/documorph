@@ -12,8 +12,11 @@ import com.documorph.dto.AuthResponse;
 import com.documorph.dto.LoginRequest;
 import com.documorph.dto.SetupRequest;
 import com.documorph.dto.SignUpRequest;
+import com.documorph.exception.InvalidCredentialsException;
+import com.documorph.service.AuthRateLimiter;
 import com.documorph.service.AuthService;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -23,9 +26,12 @@ import lombok.RequiredArgsConstructor;
 public class AuthController {
 
     private final AuthService authService;
+    private final AuthRateLimiter authRateLimiter;
 
     @PostMapping("/signup")
-    public ResponseEntity<AuthResponse> signUp(@Valid @RequestBody SignUpRequest request) {
+    public ResponseEntity<AuthResponse> signUp(@Valid @RequestBody SignUpRequest request,
+            HttpServletRequest http) {
+        authRateLimiter.checkSignup(http.getRemoteAddr());
         return ResponseEntity.ok(authService.signUp(request));
     }
 
@@ -37,7 +43,15 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authService.login(request));
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest http) {
+        authRateLimiter.checkLogin(request.getEmail(), http.getRemoteAddr());
+        try {
+            AuthResponse response = authService.login(request);
+            authRateLimiter.recordSuccess(request.getEmail());
+            return ResponseEntity.ok(response);
+        } catch (InvalidCredentialsException e) {
+            authRateLimiter.recordFailure(request.getEmail());
+            throw e;
+        }
     }
 }
