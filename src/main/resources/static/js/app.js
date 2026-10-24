@@ -1121,7 +1121,7 @@
         +   '<button class="result-tab" data-tab="json">Structured JSON</button>'
         +   '<button class="result-tab" data-tab="tables">Tables</button>'
         + '</div>'
-        + (editable ? '<div class="result-pane" id="pane-fields" hidden>' + fieldsFormHTML(fieldKeys) + '</div>' : '')
+        + (editable ? '<div class="result-pane" id="pane-fields" hidden>' + fieldsFormHTML(fieldKeys, parseFields(r.fieldLocations) || {}) + '</div>' : '')
         + '<div class="result-pane" id="pane-text" hidden><pre class="result-pre">' + esc(r.extractedText || 'No text output.') + '</pre></div>'
         + '<div class="result-pane" id="pane-json" hidden><pre class="result-pre">' + esc(prettyJson(r.structuredJson, 'No JSON output.')) + '</pre></div>'
         + '<div class="result-pane" id="pane-tables" hidden>' + renderTablesHTML(r.tables) + '</div>';
@@ -1192,20 +1192,168 @@
     }
 
     // Inputs are filled after render via .value, so values never touch innerHTML.
-    function fieldsFormHTML(keys) {
-      return '<form class="fields-form" id="fields-form">'
+    function fieldsFormHTML(keys, locs) {
+      var anyLoc = keys.some(function (k) { return locs[k]; });
+      return '<div class="fields-layout' + (anyLoc ? ' fields-layout--preview' : '') + '">'
+        + '<form class="fields-form" id="fields-form">'
         + '<p class="form-hint">Check the extracted values against the original and correct any mistakes. '
-        + 'Saving updates this result, its exports and any record set it feeds.</p>'
+        + 'Saving updates this result, its exports and any record set it feeds.'
+        + (anyLoc ? ' Click <span class="field-locate field-locate--inline" aria-hidden="true">&#8982;</span> to see where a value was found.' : '')
+        + '</p>'
         + keys.map(function (k, i) {
+            var loc = locs[k];
             return '<div class="form-field fields-row"><label class="mono" for="field-' + i + '">' + esc(k) + '</label>'
-              + '<input type="text" id="field-' + i + '" data-key="' + esc(k) + '" placeholder="(empty)" /></div>';
+              + '<div class="fields-input-wrap">'
+              + '<input type="text" id="field-' + i + '" data-key="' + esc(k) + '" placeholder="(empty)" />'
+              + (loc
+                ? '<button type="button" class="field-locate" data-key="' + esc(k) + '" title="Show where this was found (page ' + esc(loc.page) + ')" aria-label="Show ' + esc(k) + ' on the page">&#8982;</button>'
+                : (anyLoc ? '<span class="field-unlocated" title="This value wasn\u2019t found on the page">&#8212;</span>' : ''))
+              + '</div></div>';
           }).join('')
         + '<div class="fields-actions">'
         +   '<span class="fields-status" id="fields-status"></span>'
         +   '<button type="button" class="btn btn--ghost btn--sm" id="fields-reset" disabled>Undo changes</button>'
         +   '<button type="submit" class="btn btn--primary btn--sm" id="fields-save" disabled>Save changes</button>'
         + '</div>'
-        + '</form>';
+        + '</form>'
+        + (anyLoc
+          ? '<div class="page-preview" id="page-preview">'
+            + '<div class="page-preview-bar">'
+            +   '<button type="button" class="btn btn--ghost btn--sm" id="page-prev" aria-label="Previous page">&#8249;</button>'
+            +   '<span class="page-preview-label" id="page-label">Page 1</span>'
+            +   '<button type="button" class="btn btn--ghost btn--sm" id="page-next" aria-label="Next page">&#8250;</button>'
+            +   '<span class="page-preview-zoom">'
+            +     '<button type="button" class="btn btn--ghost btn--sm" id="page-zoom-out" aria-label="Zoom out">&#8722;</button>'
+            +     '<span class="page-preview-label" id="page-zoom-label">100%</span>'
+            +     '<button type="button" class="btn btn--ghost btn--sm" id="page-zoom-in" aria-label="Zoom in">+</button>'
+            +   '</span>'
+            + '</div>'
+            + '<div class="page-preview-scroll" id="page-scroll">'
+            +   '<div class="page-frame" id="page-frame"><img id="page-img" alt="Page preview" />'
+            +   '<div class="page-boxes" id="page-boxes"></div></div>'
+            +   '<p class="state-msg page-loading" id="page-loading">Loading page\u2026</p>'
+            + '</div>'
+            + '</div>'
+          : '')
+        + '</div>';
+    }
+
+    // Object URLs for rendered pages, so switching fields doesn't refetch.
+    var pageImageCache = {};
+
+    function bindPagePreview(r, inputs, locs) {
+      var img = document.getElementById('page-img');
+      if (!img) return;
+      var boxesEl = document.getElementById('page-boxes');
+      var labelEl = document.getElementById('page-label');
+      var loadingEl = document.getElementById('page-loading');
+      var scrollEl = document.getElementById('page-scroll');
+      var prevBtn = document.getElementById('page-prev');
+      var nextBtn = document.getElementById('page-next');
+      var located = Object.keys(locs);
+      var pageCount = located.reduce(function (m, k) { return Math.max(m, locs[k].page || 1); }, 1);
+      var current = 0;
+      var activeKey = null;
+      var ZOOMS = [1, 1.5, 2, 3];
+      var zoomIdx = 0;
+      var frameEl = document.getElementById('page-frame');
+      var zoomLabel = document.getElementById('page-zoom-label');
+      var zoomOutBtn = document.getElementById('page-zoom-out');
+      var zoomInBtn = document.getElementById('page-zoom-in');
+
+      function setZoom(i) {
+        zoomIdx = Math.max(0, Math.min(ZOOMS.length - 1, i));
+        frameEl.style.width = (ZOOMS[zoomIdx] * 100) + '%';
+        zoomLabel.textContent = Math.round(ZOOMS[zoomIdx] * 100) + '%';
+        zoomOutBtn.disabled = zoomIdx === 0;
+        zoomInBtn.disabled = zoomIdx === ZOOMS.length - 1;
+        centreActive(false);
+      }
+
+      // Scroll inside the preview only, so the form stays where it is.
+      function centreActive(smooth) {
+        var el = boxesEl.querySelector('.field-box--active');
+        if (!el) return;
+        var left = el.offsetLeft + el.offsetWidth / 2 - scrollEl.clientWidth / 2;
+        var top = el.offsetTop + el.offsetHeight / 2 - scrollEl.clientHeight / 2;
+        scrollEl.scrollTo({ left: Math.max(0, left), top: Math.max(0, top), behavior: smooth ? 'smooth' : 'auto' });
+      }
+
+      window.api.get('/files/' + encodeURIComponent(r.fileId) + '/pages').then(function (info) {
+        if (info && info.pageCount) { pageCount = info.pageCount; updateNav(); }
+      }).catch(function () { /* keep the estimate */ });
+
+      function updateNav() {
+        labelEl.textContent = 'Page ' + current + ' of ' + pageCount;
+        prevBtn.disabled = current <= 1;
+        nextBtn.disabled = current >= pageCount;
+      }
+
+      function drawBoxes() {
+        // Small padding so a box never clips the first or last character.
+        var PAD = 0.004;
+        boxesEl.innerHTML = located.filter(function (k) { return locs[k].page === current; }).map(function (k) {
+          var b = locs[k].box;
+          var x0 = Math.max(0, b[0] - PAD), y0 = Math.max(0, b[1] - PAD);
+          var x1 = Math.min(1, b[2] + PAD), y1 = Math.min(1, b[3] + PAD);
+          return '<button type="button" class="field-box' + (k === activeKey ? ' field-box--active' : '') + '" data-key="' + esc(k) + '"'
+            + ' style="left:' + (x0 * 100) + '%;top:' + (y0 * 100) + '%;width:' + ((x1 - x0) * 100) + '%;height:' + ((y1 - y0) * 100) + '%"'
+            + ' title="' + esc(k) + '"><span class="field-box-tag mono">' + esc(k) + '</span></button>';
+        }).join('');
+      }
+
+      async function showPage(n) {
+        n = Math.max(1, Math.min(pageCount, n));
+        if (n === current && img.src) { drawBoxes(); return; }
+        current = n;
+        updateNav();
+        var cacheKey = r.fileId + ':' + n;
+        loadingEl.hidden = false;
+        loadingEl.textContent = 'Loading page\u2026';
+        try {
+          if (!pageImageCache[cacheKey]) {
+            var blob = await window.api.downloadBlob('/files/' + encodeURIComponent(r.fileId) + '/pages/' + n);
+            pageImageCache[cacheKey] = URL.createObjectURL(blob);
+          }
+          if (current !== n) return; // a newer request won
+          img.src = pageImageCache[cacheKey];
+          loadingEl.hidden = true;
+        } catch (e) {
+          loadingEl.textContent = 'Could not load this page: ' + e.message;
+        }
+        drawBoxes();
+      }
+
+      function activate(key) {
+        if (!locs[key]) return;
+        activeKey = key;
+        inputs.forEach(function (inp) { inp.classList.toggle('field-input--located', inp.dataset.key === key); });
+        showPage(locs[key].page).then(function () {
+          // a whole page is too small to read, so jump to 2x on first use
+          if (zoomIdx === 0) setZoom(2); else centreActive(true);
+        });
+      }
+
+      zoomOutBtn.addEventListener('click', function () { setZoom(zoomIdx - 1); });
+      zoomInBtn.addEventListener('click', function () { setZoom(zoomIdx + 1); });
+      prevBtn.addEventListener('click', function () { showPage(current - 1); });
+      nextBtn.addEventListener('click', function () { showPage(current + 1); });
+      inputs.forEach(function (inp) {
+        inp.addEventListener('focus', function () { activate(inp.dataset.key); });
+      });
+      document.querySelectorAll('.field-locate[data-key]').forEach(function (btn) {
+        btn.addEventListener('click', function () { activate(btn.dataset.key); });
+      });
+      boxesEl.addEventListener('click', function (e) {
+        var box = e.target.closest('.field-box');
+        if (!box) return;
+        var inp = inputs.filter(function (i) { return i.dataset.key === box.dataset.key; })[0];
+        if (inp) inp.focus();
+      });
+
+      setZoom(0);
+      var first = located.slice().sort(function (a, b) { return locs[a].page - locs[b].page; })[0];
+      showPage(first ? locs[first].page : 1);
     }
 
     function bindFieldsForm(idx, r, fields) {
@@ -1227,6 +1375,7 @@
 
       fill();
       refresh();
+      bindPagePreview(r, inputs, parseFields(r.fieldLocations) || {});
       form.addEventListener('input', refresh);
       resetBtn.addEventListener('click', function () { fill(); refresh(); });
       form.addEventListener('submit', async function (e) {
