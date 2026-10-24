@@ -123,7 +123,13 @@ native Postgres install on the host. Connect pgAdmin to `localhost:5433`.
 `spring.jpa.hibernate.ddl-auto` is set to `validate` — Hibernate will **not**
 create or alter tables. The schema is managed deliberately, and the application
 refuses to start if the database doesn't match the entity mappings. Apply schema
-changes yourself before deploying code that depends on them.
+changes yourself before deploying code that depends on them. Scripts for tables
+added after the initial schema are in [`db/`](db/), named by date; apply them in
+order, e.g.:
+
+```bash
+docker exec -i documorph-postgres psql -U postgres -d DocuMorph_db < db/2026-10-24_chat_logs.sql
+```
 
 ---
 
@@ -167,7 +173,8 @@ All routes require a `Authorization: Bearer <token>` header except signup and lo
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/search` | Find the passages most relevant to a query |
-| `POST` | `/api/search/chat` | Ask a question; get a written answer citing your documents |
+| `POST` | `/api/search/chat` | Ask a question; get a written answer citing your documents (5 per minute per user) |
+| `GET` | `/api/search/chat/log` | Your workspace's last 50 chat questions and outcomes |
 | `POST` | `/api/search/reindex` | Rebuild the workspace vector index |
 | `GET` `POST` | `/api/forum/posts` | Organization discussion board |
 | `GET` `POST` | `/api/forum/posts/{id}/replies` | Replies to a post |
