@@ -2,6 +2,7 @@ package com.documorph.service;
 
 import java.util.UUID;
 
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +37,9 @@ public class AuthService {
     private final EventLogRepository eventLogRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+
+    /** Real BCrypt hash of a random string, compared against when the email is unknown. */
+    private static final String UNKNOWN_USER_HASH = new BCryptPasswordEncoder().encode(UUID.randomUUID().toString());
 
     @Transactional
     public AuthResponse signUp(SignUpRequest request) {
@@ -124,8 +128,13 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new InvalidCredentialsException("Invalid email or password."));
+        User user = userRepository.findByEmail(request.getEmail()).orElse(null);
+        if (user == null) {
+            // spend the same BCrypt time as a wrong password, so response time
+            // doesn't reveal which emails have accounts
+            passwordEncoder.matches(request.getPassword(), UNKNOWN_USER_HASH);
+            throw new InvalidCredentialsException("Invalid email or password.");
+        }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw new InvalidCredentialsException("Invalid email or password.");
