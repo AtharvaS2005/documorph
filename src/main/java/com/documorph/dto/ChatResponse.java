@@ -12,6 +12,12 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ChatResponse {
+	/**
+	 * ANSWERED, NOT_FOUND, BLOCKED (instructions in the question), REFUSED (not a
+	 * question about the documents) or UNGROUNDED (answer not supported by its
+	 * sources). Anything but ANSWERED comes with a fixed reply and no passages.
+	 */
+	private String outcome;
 	/** Written answer; may contain inline [n] markers pointing into passages. */
 	private String answer;
 	/** Passage numbers the answer actually relied on. */
@@ -19,6 +25,10 @@ public class ChatResponse {
 	private String modelUsed;
 	/** Every retrieved passage, numbered from 1 to match the citations. */
 	private List<Passage> passages;
+	/** Retrieved passages that had planted instructions removed before the model saw them. */
+	private int sanitizedPassages;
+	/** Sensitive identifiers masked in the answer and passages. */
+	private int redactions;
 
 	@Data
 	@Builder

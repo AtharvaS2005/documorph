@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.documorph.dto.ChatLogEntry;
 import com.documorph.dto.ChatRequest;
 import com.documorph.dto.ChatResponse;
 import com.documorph.dto.SearchResultResponse;
@@ -38,6 +39,11 @@ public class SearchController {
 	public ChatResponse chat(@Valid @RequestBody ChatRequest request,
 			@AuthenticationPrincipal UserDetails userDetails) {
 		return searchService.chat(request.getQuestion(), userDetails.getUsername());
+	}
+
+	@GetMapping("/api/search/chat/log")
+	public List<ChatLogEntry> chatLog(@AuthenticationPrincipal UserDetails userDetails) {
+		return searchService.chatLog(userDetails.getUsername());
 	}
 
 	@GetMapping("/api/search")

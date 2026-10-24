@@ -2,6 +2,7 @@ package com.documorph.exception;
 
 import java.util.stream.Collectors;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -50,6 +51,13 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(ForbiddenException.class)
 	public ResponseEntity<ErrorResponse> handleForbidden(ForbiddenException ex) {
 		return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponse(403, "Forbidden", ex.getMessage()));
+	}
+
+	@ExceptionHandler(TooManyRequestsException.class)
+	public ResponseEntity<ErrorResponse> handleTooManyRequests(TooManyRequestsException ex) {
+		return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+				.header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
+				.body(new ErrorResponse(429, "Too Many Requests", ex.getMessage()));
 	}
 
 	@ExceptionHandler(ServiceUnavailableException.class)
