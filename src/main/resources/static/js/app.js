@@ -79,6 +79,20 @@
     }, 3800);
   }
 
+  /* ── Clipboard ───────────────────────────────────────── */
+  async function copyToClipboard(text, btn) {
+    try {
+      await navigator.clipboard.writeText(text == null ? '' : String(text));
+      if (btn) {
+        btn.classList.add('is-copied');
+        setTimeout(function () { btn.classList.remove('is-copied'); }, 1200);
+      }
+      showToast('Copied to clipboard.', 'success');
+    } catch (e) {
+      showToast('Could not copy. Select the text and copy it manually.', 'error');
+    }
+  }
+
   /* ── File download ───────────────────────────────────── */
   async function downloadExport(path, fileName) {
     try {
@@ -1118,7 +1132,9 @@
         +   '<button class="result-tab" data-tab="tables">Tables</button>'
         + '</div>'
         + (editable ? '<div class="result-pane" id="pane-fields" hidden>' + fieldsFormHTML(fieldKeys, parseFields(r.fieldLocations) || {}) + '</div>' : '')
-        + '<div class="result-pane" id="pane-text" hidden><pre class="result-pre">' + esc(r.extractedText || 'No text output.') + '</pre></div>'
+        + '<div class="result-pane" id="pane-text" hidden>'
+        +   (r.extractedText ? '<div class="copy-row"><button type="button" class="btn btn--ghost btn--sm copy-btn" id="copy-text-btn">Copy text</button></div>' : '')
+        +   '<pre class="result-pre">' + esc(r.extractedText || 'No text output.') + '</pre></div>'
         + '<div class="result-pane" id="pane-json" hidden><pre class="result-pre">' + esc(prettyJson(r.structuredJson, 'No JSON output.')) + '</pre></div>'
         + '<div class="result-pane" id="pane-tables" hidden>' + renderTablesHTML(r.tables) + '</div>';
         panel.querySelector('.result-filename').textContent = r.fileName;
@@ -1132,6 +1148,8 @@
         tab.addEventListener('click', function () { showTab(tab.dataset.tab); });
       });
       showTab(firstTab);
+      var copyTextBtn = document.getElementById('copy-text-btn');
+      if (copyTextBtn) copyTextBtn.addEventListener('click', function () { copyToClipboard(r.extractedText, copyTextBtn); });
       if (editable) bindFieldsForm(idx, r, fields);
       var viewBtn = document.getElementById('view-original-btn');
       if (viewBtn) viewBtn.addEventListener('click', async function () {
@@ -1204,6 +1222,7 @@
               + (loc
                 ? '<button type="button" class="field-locate" data-key="' + esc(k) + '" title="Show where this was found (page ' + esc(loc.page) + ')" aria-label="Show ' + esc(k) + ' on the page">&#8982;</button>'
                 : (anyLoc ? '<span class="field-unlocated" title="This value wasn\u2019t found on the page">&#8212;</span>' : ''))
+              + '<button type="button" class="field-copy" data-key="' + esc(k) + '" title="Copy value" aria-label="Copy ' + esc(k) + '">&#10697;</button>'
               + '</div></div>';
           }).join('')
         + '<div class="fields-actions">'
@@ -1371,6 +1390,13 @@
 
       fill();
       refresh();
+      // copies what's in the box now, so an unsaved correction is what gets copied
+      form.querySelectorAll('.field-copy').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var inp = inputs.filter(function (i) { return i.dataset.key === btn.dataset.key; })[0];
+          if (inp) copyToClipboard(inp.value, btn);
+        });
+      });
       bindPagePreview(r, inputs, parseFields(r.fieldLocations) || {});
       form.addEventListener('input', refresh);
       resetBtn.addEventListener('click', function () { fill(); refresh(); });
