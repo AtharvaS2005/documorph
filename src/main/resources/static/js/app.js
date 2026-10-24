@@ -1345,7 +1345,16 @@
         return passages.some(function (p) { return p.number === n; });
       });
       var shown = passages.filter(function (p) { return used.indexOf(p.number) !== -1; });
+      // Guardrail replies (not found, refused, blocked, unverified) read as a notice, not an answer.
+      el.classList.toggle('chat-msg--notice', !!res.outcome && res.outcome !== 'ANSWERED');
+      var notes = [];
+      if (res.sanitizedPassages) {
+        notes.push('Instructions hidden in ' + res.sanitizedPassages + ' document passage'
+          + (res.sanitizedPassages === 1 ? ' were' : 's were') + ' ignored.');
+      }
+      if (res.redactions) notes.push('Sensitive ID numbers were hidden.');
       el.innerHTML = '<div class="chat-answer">' + answerHTML(res.answer || '', passages) + '</div>'
+        + (notes.length ? '<p class="chat-guard-note">' + esc(notes.join(' ')) + '</p>' : '')
         + (shown.length
           ? '<div class="chat-sources"><p class="chat-sources-title">Sources</p>'
             + shown.map(function (p) {

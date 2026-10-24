@@ -593,3 +593,5 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .chat-form { display: flex; gap: 0.5rem; align-items: flex-end; }
 .chat-form textarea { flex: 1; resize: vertical; padding: 0.65rem 0.875rem; border: 1.5px solid var(--line-2); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); font-size: 0.9rem; font-family: inherit; }
 @media (max-width: 600px) { .chat-msg { max-width: 100%; } }
+.chat-msg--notice { color: var(--muted); background: var(--bg-2); border-style: dashed; }
+.chat-guard-note { margin: 0.5rem 0 0; font-size: 0.76rem; color: var(--amber); }
