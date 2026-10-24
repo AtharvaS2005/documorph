@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.MediaType;
@@ -18,16 +19,24 @@ import org.springframework.web.client.RestClient;
 @Service
 public class PythonPipelineClient {
 
+	private static final String API_KEY_HEADER = "X-Pipeline-Key";
+
 	private final RestClient restClient;
 	// separate client so a dead pipeline fails the health check in seconds, not minutes
 	private final RestClient healthClient;
 
-	public PythonPipelineClient(@Value("${python.service.url}") String baseUrl) {
-		this.restClient = RestClient.builder().baseUrl(baseUrl).build();
+	public PythonPipelineClient(@Value("${python.service.url}") String baseUrl,
+			@Value("${python.service.api-key:}") String apiKey) {
+		if (apiKey == null || apiKey.isBlank()) {
+			LoggerFactory.getLogger(PythonPipelineClient.class)
+					.warn("PIPELINE_API_KEY is not set; the processing service will reject calls from Docker.");
+		}
+		this.restClient = RestClient.builder().baseUrl(baseUrl).defaultHeader(API_KEY_HEADER, apiKey).build();
 		SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
 		factory.setConnectTimeout(Duration.ofSeconds(2));
 		factory.setReadTimeout(Duration.ofSeconds(5));
-		this.healthClient = RestClient.builder().baseUrl(baseUrl).requestFactory(factory).build();
+		this.healthClient = RestClient.builder().baseUrl(baseUrl).defaultHeader(API_KEY_HEADER, apiKey)
+				.requestFactory(factory).build();
 	}
 
 	/**

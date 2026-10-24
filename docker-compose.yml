@@ -7,7 +7,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${DOCUMORPH_DB_PASSWORD}
     ports:
-      - "5433:5432"
+      # this machine only: the database should not be reachable from the network
+      - "127.0.0.1:5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
@@ -28,6 +29,7 @@ services:
       DOCUMORPH_DB_PASSWORD: ${DOCUMORPH_DB_PASSWORD}
       DOCUMORPH_JWT_SECRET: ${DOCUMORPH_JWT_SECRET}
       PYTHON_SERVICE_URL: http://host.docker.internal:8000
+      PIPELINE_API_KEY: ${PIPELINE_API_KEY}
       DOCUMORPH_UPLOAD_DIR: /app/uploads
     ports:
       - "8080:8080"

@@ -93,6 +93,7 @@ Create a `.env` file in the project root:
 ```env
 DOCUMORPH_DB_PASSWORD=your_database_password
 DOCUMORPH_JWT_SECRET=a_long_random_secret_at_least_256_bits
+PIPELINE_API_KEY=the_same_value_as_in_the_pipeline_repo_.env
 ```
 
 Full set of recognised variables:
@@ -106,6 +107,7 @@ Full set of recognised variables:
 | `DOCUMORPH_JWT_EXPIRATION` | `86400000` | Token lifetime, ms (24 h) |
 | `DOCUMORPH_UPLOAD_DIR` | `./uploads` | Where uploaded files are written |
 | `PYTHON_SERVICE_URL` | `http://localhost:8000` | Pipeline service address |
+| `PIPELINE_API_KEY` | *required* | Shared secret sent to the pipeline as `X-Pipeline-Key` |
 
 ### Run
 
