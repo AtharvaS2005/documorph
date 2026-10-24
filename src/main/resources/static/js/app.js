@@ -500,7 +500,8 @@
         var res = await window.api.post('/auth/login', { email: email, password: password });
         window.api.setToken(res.token);
         window.api.setMe({ userId: res.userId, email: res.email, userType: res.userType, workspaceId: res.workspaceId, organizationId: res.organizationId });
-        location.href = 'home.html';
+        // an account that signed up but never finished setup goes back there
+        location.href = res.isSetupCompleted === false ? 'setup.html' : 'home.html';
       } catch (err) {
         errEl.textContent = err.message;
         errEl.hidden = false;
@@ -550,8 +551,8 @@
       btn.textContent = 'Creating account\u2026';
       try {
         var res = await window.api.post('/auth/signup', { email: email, password: password });
-        sessionStorage.setItem('dm_pending_user_id', String(res.userId));
-        sessionStorage.setItem('dm_pending_email', email);
+        window.api.setToken(res.token);
+        window.api.setMe({ userId: res.userId, email: res.email, workspaceId: res.workspaceId });
         location.href = 'setup.html';
       } catch (err) {
         errEl.textContent = err.message;
@@ -605,20 +606,19 @@
       btn.disabled = true;
       btn.textContent = 'Setting up\u2026';
 
-      var pendingUserId = sessionStorage.getItem('dm_pending_user_id');
       var userType = document.getElementById('userType').value;
       var orgName = document.getElementById('orgName') ? document.getElementById('orgName').value.trim() : '';
       var inviteCode = document.getElementById('inviteCode') ? document.getElementById('inviteCode').value.trim() : '';
 
-      if (!pendingUserId) {
-        errEl.textContent = 'Session expired. Please sign up again.';
+      if (!window.api.getToken()) {
+        errEl.textContent = 'Session expired. Please sign in again.';
         errEl.hidden = false;
         btn.disabled = false;
         btn.textContent = 'Finish Setup';
         return;
       }
 
-      var body = { userId: pendingUserId, userType: userType };
+      var body = { userType: userType };
 
       if (userType === 'ORGANIZATION') {
         if (inviteCode) {
@@ -633,12 +633,8 @@
         if (res.token) {
           window.api.setToken(res.token);
           window.api.setMe({ userId: res.userId, email: res.email, userType: res.userType, workspaceId: res.workspaceId, organizationId: res.organizationId });
-          sessionStorage.removeItem('dm_pending_user_id');
-          sessionStorage.removeItem('dm_pending_email');
           location.href = 'home.html';
         } else {
-          sessionStorage.removeItem('dm_pending_user_id');
-          sessionStorage.removeItem('dm_pending_email');
           showToast('Setup complete! Please sign in.', 'success');
           setTimeout(function () { location.href = 'sign-in.html'; }, 1500);
         }
