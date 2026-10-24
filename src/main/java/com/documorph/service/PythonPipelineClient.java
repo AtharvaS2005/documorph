@@ -84,6 +84,13 @@ public class PythonPipelineClient {
 				.body(List.class);
 	}
 
+	/** Retrieve-then-generate: returns {answer, sources, model_used, passages}. */
+	public Map<?, ?> answer(String question, int topK, String workspaceId) {
+		Map<String, Object> body = Map.of("question", question, "topK", topK, "workspaceId", workspaceId);
+		return restClient.post().uri("/answer").contentType(MediaType.APPLICATION_JSON).body(body).retrieve()
+				.body(Map.class);
+	}
+
 	public int deleteDocuments(List<String> docIds, String workspaceId) {
 		Map<String, Object> body = Map.of("docIds", docIds, "workspaceId", workspaceId);
 		Map<?, ?> response = restClient.post().uri("/delete-docs").contentType(MediaType.APPLICATION_JSON).body(body)
