@@ -13,6 +13,7 @@ import com.documorph.dto.SetupRequest;
 import com.documorph.dto.SignUpRequest;
 import com.documorph.exception.EmailAlreadyExistsException;
 import com.documorph.exception.InvalidCredentialsException;
+import com.documorph.exception.ForbiddenException;
 import com.documorph.exception.ResourceNotFoundException;
 import com.documorph.model.EventLog;
 import com.documorph.model.Organization;
@@ -59,19 +60,25 @@ public class AuthService {
                 .targetId(user.getId().toString())
                 .build());
 
+        // The token lets the new account call /api/auth/setup as itself; setup
+        // used to trust a userId from the request body instead.
         return AuthResponse.builder()
                 .userId(user.getId())
                 .email(user.getEmail())
                 .isSetupCompleted(false)
                 .workspaceId(workspace.getId())
+                .token(jwtService.generateToken(user.getEmail()))
                 .message("Sign up successful. Please complete setup.")
                 .build();
     }
 
     @Transactional
-    public AuthResponse setupUser(SetupRequest request) {
-        User user = userRepository.findById(request.getUserId())
+    public AuthResponse setupUser(SetupRequest request, String email) {
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found."));
+        if (Boolean.TRUE.equals(user.getIsSetupCompleted())) {
+            throw new ForbiddenException("Account setup is already complete.");
+        }
 
         Workspace workspace = workspaceRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace not found for user."));

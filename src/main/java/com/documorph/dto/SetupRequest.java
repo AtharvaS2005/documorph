@@ -1,15 +1,10 @@
 package com.documorph.dto;
 
-import java.util.UUID;
-
 import com.documorph.model.User.UserType;
 
 import jakarta.validation.constraints.NotNull;
 
 public class SetupRequest {
-
-    @NotNull(message = "User ID is required")
-    private UUID userId;
 
     @NotNull(message = "User type is required")
     private UserType userType;
@@ -18,14 +13,6 @@ public class SetupRequest {
     private String inviteCode;
 
     public SetupRequest() {
-    }
-
-    public UUID getUserId() {
-        return userId;
-    }
-
-    public void setUserId(UUID userId) {
-        this.userId = userId;
     }
 
     public UserType getUserType() {

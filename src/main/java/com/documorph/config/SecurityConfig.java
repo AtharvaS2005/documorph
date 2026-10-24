@@ -31,7 +31,8 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-						.requestMatchers("/api/auth/**").permitAll()
+						// setup is deliberately not public: it acts on the signed-in account
+						.requestMatchers("/api/auth/signup", "/api/auth/login").permitAll()
 						.requestMatchers(request -> !request.getServletPath().startsWith("/api/")).permitAll()
                         .anyRequest().authenticated())
                 .authenticationProvider(authenticationProvider)

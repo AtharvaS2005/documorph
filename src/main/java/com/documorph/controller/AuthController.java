@@ -1,6 +1,8 @@
 package com.documorph.controller;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,9 +29,11 @@ public class AuthController {
         return ResponseEntity.ok(authService.signUp(request));
     }
 
+    /** Finish setting up the signed-in account (once). Requires the token from sign-up. */
     @PostMapping("/setup")
-    public ResponseEntity<AuthResponse> setupUser(@Valid @RequestBody SetupRequest request) {
-        return ResponseEntity.ok(authService.setupUser(request));
+    public ResponseEntity<AuthResponse> setupUser(@Valid @RequestBody SetupRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        return ResponseEntity.ok(authService.setupUser(request, userDetails.getUsername()));
     }
 
     @PostMapping("/login")
