@@ -79,7 +79,10 @@ public class UploadSessionService {
 			if (categoryId == null) {
 				throw new IllegalArgumentException("Category ID is required for Category Run sessions.");
 			}
+			// Another workspace's category must look like it doesn't exist: running
+			// against it would append this user's extractions to their record set.
 			category = categoryRepository.findById(categoryId)
+					.filter(c -> c.getWorkspace().getId().equals(workspace.getId()))
 					.orElseThrow(() -> new ResourceNotFoundException("Category not found."));
 		}
 

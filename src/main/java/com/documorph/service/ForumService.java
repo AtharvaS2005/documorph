@@ -54,13 +54,16 @@ public class ForumService {
 
 		UploadSession session = null;
 		if (request.getSessionId() != null) {
+			// only the poster's own work can be linked to a post
 			session = uploadSessionRepository.findById(request.getSessionId())
+					.filter(s -> s.getWorkspace().getId().equals(workspace.getId()))
 					.orElseThrow(() -> new ResourceNotFoundException("Session not found."));
 		}
 
 		RecordSet recordSet = null;
 		if (request.getRecordSetId() != null) {
 			recordSet = recordSetRepository.findById(request.getRecordSetId())
+					.filter(r -> r.getWorkspace().getId().equals(workspace.getId()))
 					.orElseThrow(() -> new ResourceNotFoundException("Record set not found."));
 		}
 
