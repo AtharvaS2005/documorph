@@ -146,10 +146,13 @@ All routes require a `Authorization: Bearer <token>` header except signup and lo
 | `GET` | `/api/sessions` | List sessions |
 | `GET` | `/api/sessions/{id}/status` | Per-job progress |
 | `GET` | `/api/sessions/{id}/results` | Extracted text, fields and tables |
-| `GET` | `/api/sessions/{id}/export` | Download results as CSV |
+| `GET` | `/api/sessions/{id}/export` | Download results as JSON, CSV or Excel (`?format=json\|csv\|xlsx`) |
+| `GET` | `/api/sessions/export` | Combine several sessions into one CSV or Excel file (`?ids=…&format=…`) |
+| `PUT` | `/api/sessions/{id}/files/{fileId}/fields` | Correct extracted fields; updates any linked record set |
 | `DELETE` | `/api/sessions/{id}` | Remove session, files and vectors |
 | `POST` | `/api/sessions/jobs/{jobId}/retry` | Resubmit a failed job |
 | `GET` | `/api/files/{fileId}` | Download an original upload |
+| `GET` | `/api/pipeline/health` | Whether the processing service can accept jobs |
 
 ### Categories and record sets
 | Method | Path | Purpose |
@@ -158,11 +161,13 @@ All routes require a `Authorization: Bearer <token>` header except signup and lo
 | `GET` `PUT` `DELETE` | `/api/categories/{id}` | Manage a category |
 | `GET` `POST` | `/api/record-sets` | List / create record sets |
 | `GET` `DELETE` | `/api/record-sets/{id}` | Read / remove a record set |
+| `GET` | `/api/record-sets/{id}/export` | Download a record set as CSV or Excel |
 
 ### Search and forum
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/api/search` | Ask a question across your documents |
+| `GET` | `/api/search` | Find the passages most relevant to a query |
+| `POST` | `/api/search/chat` | Ask a question; get a written answer citing your documents |
 | `POST` | `/api/search/reindex` | Rebuild the workspace vector index |
 | `GET` `POST` | `/api/forum/posts` | Organization discussion board |
 | `GET` `POST` | `/api/forum/posts/{id}/replies` | Replies to a post |
