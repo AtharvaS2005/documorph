@@ -1,0 +1,94 @@
+# Production stack for a single cloud VM. Only Caddy is reachable from the
+# internet (ports 80 and 443); everything else talks over the internal
+# network. Documents are processed on Modal's GPUs; see the pipeline
+# repository's modal_app.py.
+#
+# Expects the pipeline repository cloned next to this one:
+#   ~/documorph               (this repository)
+#   ~/documorph-nlp-pipeline
+#
+# Start:  docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: DocuMorph_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DOCUMORPH_DB_PASSWORD:?set DOCUMORPH_DB_PASSWORD in .env.prod}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      # runs only when the data volume is empty, i.e. on first start
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d DocuMorph_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  qdrant:
+    image: qdrant/qdrant:v1.15.4
+    restart: unless-stopped
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  pipeline-api:
+    build:
+      context: ../documorph-nlp-pipeline
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    depends_on:
+      - qdrant
+    environment:
+      PIPELINE_BACKEND: modal
+      PIPELINE_API_KEY: ${PIPELINE_API_KEY:?set PIPELINE_API_KEY in .env.prod}
+      QDRANT_URL: http://qdrant:6333
+      MODAL_TOKEN_ID: ${MODAL_TOKEN_ID:?set MODAL_TOKEN_ID in .env.prod}
+      MODAL_TOKEN_SECRET: ${MODAL_TOKEN_SECRET:?set MODAL_TOKEN_SECRET in .env.prod}
+    volumes:
+      - hf_cache:/hf  # bge-m3 embedding weights, kept across restarts
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pipeline-api:
+        condition: service_started
+    environment:
+      DOCUMORPH_DB_URL: jdbc:postgresql://postgres:5432/DocuMorph_db
+      DOCUMORPH_DB_USERNAME: postgres
+      DOCUMORPH_DB_PASSWORD: ${DOCUMORPH_DB_PASSWORD}
+      DOCUMORPH_JWT_SECRET: ${DOCUMORPH_JWT_SECRET:?set DOCUMORPH_JWT_SECRET in .env.prod}
+      PYTHON_SERVICE_URL: http://pipeline-api:8000
+      PIPELINE_API_KEY: ${PIPELINE_API_KEY}
+      DOCUMORPH_UPLOAD_DIR: /app/uploads
+    volumes:
+      - uploads_data:/app/uploads
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env.prod}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  postgres_data:
+  qdrant_data:
+  hf_cache:
+  uploads_data:
+  caddy_data:
+  caddy_config:

@@ -39,3 +39,7 @@ out/
 .env
 uploads/
 gradle-cache/
+
+# any environment file holds real secrets; only templates are committed
+.env.*
+!*.example
