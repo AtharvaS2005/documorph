@@ -41,7 +41,7 @@
     + '</g></svg>';
 
   const PAGE_TITLES = {
-    index: 'DocuMorph',
+    index: 'Intelligent Document Processing',
     'sign-in': 'Sign In',
     'sign-up': 'Sign Up',
     setup: 'Complete Setup',
@@ -57,7 +57,7 @@
     terms: 'Terms of Service',
     guide: 'Usage Guide'
   };
-  if (PAGE_TITLES[PAGE]) document.title = PAGE_TITLES[PAGE] + ' \u2014 DocuMorph';
+  if (PAGE_TITLES[PAGE]) document.title = PAGE_TITLES[PAGE] + ' \u2014 IDP Platform';
 
   /* ── Toast ───────────────────────────────────────────── */
   function showToast(msg, type) {
@@ -205,7 +205,7 @@
       '<div class="app">'
       + '<header class="appbar">'
       +   '<div class="appbar-row">'
-      +     '<a href="home.html" class="brand">' + LOGO_SVG + '<span class="brand-name">DocuMorph</span></a>'
+      +     '<a href="home.html" class="brand">' + LOGO_SVG + '<span class="brand-name">IDP Platform</span></a>'
       +     '<nav class="nav-rail">' + navItems + '</nav>'
       +     '<div class="appbar-right">'
       +       '<div class="topbar-actions" id="topbar-actions"></div>'
@@ -271,7 +271,7 @@
 
       /* ── Header ── */
       + '<header class="lp-header">'
-      +   '<div class="landing-brand">' + LOGO_SVG + '<span class="brand-name">DocuMorph</span></div>'
+      +   '<div class="landing-brand">' + LOGO_SVG + '<span class="brand-name">IDP Platform</span></div>'
       +   '<nav class="lp-nav">'
       +     '<a href="#how-it-works" class="lp-nav-link">How it works</a>'
       +     '<a href="#features" class="lp-nav-link">Features</a>'
@@ -285,7 +285,7 @@
       +   '<div class="lp-hero-left">'
       +     '<div class="lp-eyebrow">Intelligent Document Processing</div>'
       +     '<h1 class="lp-title">Turn any document<br>into <span class="gradient-word">structured data</span></h1>'
-      +     '<p class="lp-sub">Upload PDFs, Word docs, scanned images and more. DocuMorph extracts text and structured JSON automatically — at scale, in seconds.</p>'
+      +     '<p class="lp-sub">Upload PDFs, Word docs, scanned images and more. The IDP Platform extracts text and structured JSON automatically — at scale, in seconds.</p>'
       +     '<div class="lp-hero-cta">'
       +       '<a href="sign-up.html" class="btn btn--primary btn--lg">Start for free</a>'
       +       '<a href="sign-in.html" class="btn btn--ghost btn--lg">Sign in</a>'
@@ -455,12 +455,12 @@
 
       /* ── Footer ── */
       +   '<div class="lp-footer-inner">'
-      +     '<div class="landing-brand">' + LOGO_SVG + '<span class="brand-name">DocuMorph</span></div>'
+      +     '<div class="landing-brand">' + LOGO_SVG + '<span class="brand-name">IDP Platform</span></div>'
       +     '<nav class="lp-footer-nav">'
       +       '<a href="guide.html" class="lp-nav-link">Usage Guide</a>'
       +       '<a href="terms.html" class="lp-nav-link">Terms of Service</a>'
       +     '</nav>'
-      +     '<p class="lp-footer-copy">&#169; 2026 DocuMorph &mdash; Intelligent Document Processing Platform</p>'
+      +     '<p class="lp-footer-copy">&#169; 2026 IDP Platform &mdash; Local Intelligent Document Processing</p>'
       +   '</div>'
 
     app.querySelectorAll('a[href^="#"]').forEach(function (a) {
@@ -585,7 +585,7 @@
       '<div class="auth-layout">'
       + '<div class="auth-showcase"><div class="auth-showcase-inner">'
       +   '<span class="brand-mark-lg">' + LOGO_SVG + '</span>'
-      +   '<h2>One more step</h2><p>Tell us how you plan to use DocuMorph.</p>'
+      +   '<h2>One more step</h2><p>Tell us how you plan to use the IDP Platform.</p>'
       + '</div></div>'
       + '<div class="auth-form-wrap"><div class="auth-form-inner">'
       +   '<h1 class="auth-title">Complete Setup</h1>'
@@ -1780,7 +1780,7 @@
       var d = new Date();
       var stamp = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
       downloadExport('/sessions/export?format=' + fmt + '&ids=' + ids.map(encodeURIComponent).join(','),
-        'documorph-export-' + stamp + '.' + fmt);
+        'idp-export-' + stamp + '.' + fmt);
     }
 
     document.getElementById('bulk-csv-btn').addEventListener('click', function () { bulkExport('csv'); });
@@ -2421,7 +2421,7 @@
     app.innerHTML =
       '<div class="doc-public">'
       + '<header class="lp-header">'
-      +   '<a href="index.html" class="landing-brand">' + LOGO_SVG + '<span class="brand-name">DocuMorph</span></a>'
+      +   '<a href="index.html" class="landing-brand">' + LOGO_SVG + '<span class="brand-name">IDP Platform</span></a>'
       +   '<nav class="lp-nav">'
       +     '<a href="terms.html" class="lp-nav-link">Terms</a>'
       +     '<a href="guide.html" class="lp-nav-link">Guide</a>'
@@ -2440,17 +2440,17 @@
       '<div class="doc-prose">'
       + '<p class="doc-updated">Last updated: 30 August 2026</p>'
 
-      + '<div class="doc-callout"><strong>Plain summary.</strong> DocuMorph reads your documents and pulls out '
+      + '<div class="doc-callout"><strong>Plain summary.</strong> The IDP Platform reads your documents and pulls out '
       + 'structured data. Your documents stay on the server running this software and are processed by local '
       + 'models — nothing is sent to an external AI service. Extraction is automated and <em>will</em> sometimes '
       + 'be wrong, so check anything that matters. You can delete your data at any time.</div>'
 
       + '<h2>1. Acceptance</h2>'
-      + '<p>By creating an account or using DocuMorph ("the Service"), you agree to these terms. If you do not '
+      + '<p>By creating an account or using the IDP Platform ("the Service"), you agree to these terms. If you do not '
       + 'agree, do not use the Service.</p>'
 
       + '<h2>2. What the Service does</h2>'
-      + '<p>DocuMorph accepts documents you upload, performs optical character recognition and table detection on '
+      + '<p>The IDP Platform accepts documents you upload, performs optical character recognition and table detection on '
       + 'them, and uses a language model to produce summaries or extract named fields. Extracted text is indexed '
       + 'so you can search across your documents.</p>'
 
