@@ -120,7 +120,8 @@ public class JobResultProcessor {
 		var file = job.getFile();
 		var session = file.getSession();
 		pythonPipelineClient.indexDocument(file.getId().toString(), output.getExtractedText(),
-				session.getWorkspace().getId().toString(), session.getId().toString(), file.getFileName());
+				session.getWorkspace().getId().toString(), session.getId().toString(), file.getFileName(),
+				file.getUploadedAt());
 	}
 
 	@Transactional(propagation = Propagation.REQUIRES_NEW)

@@ -2,6 +2,8 @@ package com.documorph.service;
 
 import java.io.File;
 import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -79,12 +81,30 @@ public class PythonPipelineClient {
 		return restClient.get().uri("/status/{id}", pythonJobId).retrieve().body(Map.class);
 	}
 
-	public int indexDocument(String docId, String text, String workspaceId, String sessionId, String fileName) {
-		Map<String, Object> body = Map.of("docId", docId, "text", text, "workspaceId", workspaceId, "sessionId",
-				sessionId == null ? "" : sessionId, "fileName", fileName == null ? "" : fileName);
+	/**
+	 * Index a document's text for retrieval. uploadedAt is the file's real
+	 * upload time, sent so that a re-index keeps a document's original date
+	 * rather than stamping it with the moment the re-index ran; search uses
+	 * it to answer questions with a date window ("uploaded in the past
+	 * four days"). Null lets the pipeline default it to now.
+	 */
+	public int indexDocument(String docId, String text, String workspaceId, String sessionId, String fileName,
+			OffsetDateTime uploadedAt) {
+		Map<String, Object> body = new HashMap<>();
+		body.put("docId", docId);
+		body.put("text", text);
+		body.put("workspaceId", workspaceId);
+		body.put("sessionId", sessionId == null ? "" : sessionId);
+		body.put("fileName", fileName == null ? "" : fileName);
+		body.put("uploadedAt", uploadedAt == null ? null : uploadedAt.toEpochSecond());
 		Map<?, ?> response = restClient.post().uri("/index").contentType(MediaType.APPLICATION_JSON).body(body)
 				.retrieve().body(Map.class);
 		return ((Number) response.get("chunksIndexed")).intValue();
+	}
+
+	/** Overload for callers with no upload time to hand; the pipeline uses now. */
+	public int indexDocument(String docId, String text, String workspaceId, String sessionId, String fileName) {
+		return indexDocument(docId, text, workspaceId, sessionId, fileName, null);
 	}
 
 	public List<?> retrieve(String query, int topK, String workspaceId) {
@@ -94,6 +114,23 @@ public class PythonPipelineClient {
 	}
 
 	/** Retrieve-then-generate: returns {answer, sources, model_used, passages}. */
+	/**
+	 * Ask a question, optionally with the recent turns of the same
+	 * conversation (oldest first) so the pipeline can resolve a follow-up
+	 * like "what about that one" into a standalone question before it
+	 * searches. An empty history behaves exactly as before.
+	 */
+	public Map<?, ?> answer(String question, int topK, String workspaceId,
+			List<Map<String, String>> history) {
+		Map<String, Object> body = new HashMap<>();
+		body.put("question", question);
+		body.put("topK", topK);
+		body.put("workspaceId", workspaceId);
+		body.put("history", history == null ? List.of() : history);
+		return restClient.post().uri("/answer").contentType(MediaType.APPLICATION_JSON).body(body).retrieve()
+				.body(Map.class);
+	}
+
 	public Map<?, ?> answer(String question, int topK, String workspaceId) {
 		Map<String, Object> body = Map.of("question", question, "topK", topK, "workspaceId", workspaceId);
 		return restClient.post().uri("/answer").contentType(MediaType.APPLICATION_JSON).body(body).retrieve()

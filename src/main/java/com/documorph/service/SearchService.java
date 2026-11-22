@@ -1,8 +1,12 @@
 package com.documorph.service;
 
+import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -37,6 +41,17 @@ public class SearchService {
 
 	/** Passages handed to the model; more costs latency on a small local model. */
 	private static final int CHAT_TOP_K = 5;
+
+	/** Turns of context sent with a question, so a follow-up can be resolved. */
+	private static final int HISTORY_TURNS = 3;
+
+	/**
+	 * How long a question stays part of "this conversation". The chat log is
+	 * permanent and per-workspace, so without a cutoff a question asked last
+	 * week would become the context for a pronoun asked today, and resolve it
+	 * to the wrong document.
+	 */
+	private static final Duration HISTORY_WINDOW = Duration.ofMinutes(30);
 
 	public List<SearchResultResponse> search(String query, int topK, String email) {
 		User user = userRepository.findByEmail(email)
@@ -83,7 +98,8 @@ public class SearchService {
 		try {
 			Map<?, ?> raw;
 			try {
-				raw = pythonPipelineClient.answer(q, CHAT_TOP_K, workspace.getId().toString());
+				raw = pythonPipelineClient.answer(q, CHAT_TOP_K, workspace.getId().toString(),
+						recentTurns(workspace.getId()));
 			} catch (ResourceAccessException e) {
 				audit(user, workspace, q, null, ChatLog.ERROR, started);
 				throw new ServiceUnavailableException(
@@ -99,6 +115,26 @@ public class SearchService {
 		} finally {
 			chatRateLimiter.release(userKey);
 		}
+	}
+
+	/**
+	 * The last few answered turns in this workspace, oldest first, limited to
+	 * a recent time window. Only ANSWERED turns are included: a refusal or a
+	 * "couldn't find that" carries no subject for a pronoun to attach to, and
+	 * feeding it back as context only misleads the rewriter.
+	 */
+	private List<Map<String, String>> recentTurns(UUID workspaceId) {
+		OffsetDateTime cutoff = OffsetDateTime.now().minus(HISTORY_WINDOW);
+		List<Map<String, String>> turns = chatLogRepository
+				.findTop50ByWorkspaceIdOrderByCreatedAtDesc(workspaceId).stream()
+				.filter(l -> l.getCreatedAt() != null && l.getCreatedAt().isAfter(cutoff))
+				.filter(l -> "ANSWERED".equals(l.getOutcome()))
+				.filter(l -> l.getQuestion() != null && l.getAnswer() != null)
+				.limit(HISTORY_TURNS)
+				.map(l -> Map.of("question", l.getQuestion(), "answer", l.getAnswer()))
+				.collect(Collectors.toCollection(ArrayList::new));
+		Collections.reverse(turns); // the pipeline expects oldest first
+		return turns;
 	}
 
 	/** The caller's most recent chat questions, newest first. */

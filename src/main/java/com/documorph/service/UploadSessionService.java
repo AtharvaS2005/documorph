@@ -361,7 +361,7 @@ public class UploadSessionService {
 				}
 				try {
 					pythonPipelineClient.indexDocument(file.getId().toString(), output.getExtractedText(), workspaceId,
-							session.getId().toString(), file.getFileName());
+							session.getId().toString(), file.getFileName(), file.getUploadedAt());
 					indexed++;
 				} catch (Exception e) {
 					log.warn("Reindex failed for file {}", file.getId(), e);
